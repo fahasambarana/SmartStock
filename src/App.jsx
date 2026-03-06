@@ -1,6 +1,7 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import Login from './pages/Login';
 import Register from './pages/Register';
+import Home from './pages/Home';
 import Dashboard from './pages/Dashboard';
 import Products from './pages/Products';
 import Zones from './pages/Zones';
@@ -22,7 +23,7 @@ function App() {
         <Route path="/movements" element={<ProtectedRoute allowedRoles={['Admin', 'Manager', 'Employee']}><DashboardLayout><Movements /></DashboardLayout></ProtectedRoute>} />
         <Route path="/alerts" element={<ProtectedRoute allowedRoles={['Admin', 'Manager', 'Employee', 'Viewer']}><DashboardLayout><Alerts /></DashboardLayout></ProtectedRoute>} />
         <Route path="/users" element={<ProtectedRoute allowedRoles={['Admin']}><DashboardLayout><Users /></DashboardLayout></ProtectedRoute>} />
-        <Route path="/" element={<Login />} />
+        <Route path="/" element={<Home />} />
       </Routes>
     </Router>
   );
