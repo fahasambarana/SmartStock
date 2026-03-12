@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_BASE_URL = 'http://localhost:3000/api'; // Replace with your backend URL
+const API_BASE_URL = 'http://localhost:5000/api'; // Backend URL
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -27,5 +27,8 @@ export const getUsers = () => api.get('/users');
 export const createUser = (user) => api.post('/users', user);
 export const updateUser = (id, user) => api.put(`/users/${id}`, user);
 export const deleteUser = (id) => api.delete(`/users/${id}`);
+
+export const register = (userData) => api.post('/auth/register', userData);
+export const login = (credentials) => api.post('/auth/login', credentials);
 
 export default api;
