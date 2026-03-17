@@ -3,15 +3,17 @@ const Zone = require('../models/Zone');
 // Create a new zone
 exports.createZone = async (req, res) => {
   try {
-    const { name, description, location } = req.body;
+    const { name, description, location, type, unite_capacite, capacite_max, capacite_type } = req.body;
     
-    // Check if zone with same name exists
-    const existingZone = await Zone.findOne({ where: { name } });
-    if (existingZone) {
-      return res.status(400).json({ message: 'Zone with this name already exists' });
-    }
-
-    const zone = await Zone.create({ name, description, location });
+    const zone = await Zone.create({ 
+      name, 
+      description, 
+      location, 
+      type,
+      unite_capacite: unite_capacite || 'Unités',
+      capacite_max: parseFloat(capacite_max) || 0,
+      capacite_type: parseFloat(capacite_type) || 0
+    });
     res.status(201).json(zone);
   } catch (error) {
     res.status(500).json({ message: 'Error creating zone', error: error.message });
@@ -46,7 +48,7 @@ exports.getZoneById = async (req, res) => {
 // Update a zone
 exports.updateZone = async (req, res) => {
   try {
-    const { name, description, location } = req.body;
+    const { name, description, location, unite_capacite, capacite_max, type } = req.body;
     const zone = await Zone.findByPk(req.params.id);
     
     if (!zone) {
@@ -64,6 +66,9 @@ exports.updateZone = async (req, res) => {
     zone.name = name || zone.name;
     zone.description = description !== undefined ? description : zone.description;
     zone.location = location !== undefined ? location : zone.location;
+    zone.unite_capacite = unite_capacite || zone.unite_capacite;
+    zone.capacite_max = capacite_max !== undefined ? parseFloat(capacite_max) : zone.capacite_max;
+    zone.type = type !== undefined ? type : zone.type;
 
     await zone.save();
     res.json(zone);

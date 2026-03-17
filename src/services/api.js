@@ -18,6 +18,9 @@ export const createZone = (zone) => api.post('/zones', zone);
 export const updateZone = (id, zone) => api.put(`/zones/${id}`, zone);
 export const deleteZone = (id) => api.delete(`/zones/${id}`);
 
+export const getZoneTypes = () => api.get('/zone-types');
+export const createZoneType = (zoneType) => api.post('/zone-types', zoneType);
+
 export const getMovements = () => api.get('/movements');
 export const createMovement = (movement) => api.post('/movements', movement);
 

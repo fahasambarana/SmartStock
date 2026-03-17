@@ -2,9 +2,6 @@ const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
 const sequelize = require('./config/database');
-const authRoutes = require('./routes/auth');
-const zoneRoutes = require('./routes/zones');
-const productRoutes = require('./routes/products');
 
 const Product = require('./models/Product');
 const Zone = require('./models/Zone');
@@ -19,9 +16,9 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-app.use('/api/auth', authRoutes);
-app.use('/api/zones', zoneRoutes);
-app.use('/api/products', productRoutes);
+app.use('/api/auth', require('./routes/auth'));
+app.use('/api/zones', require('./routes/zones'));
+app.use('/api/products', require('./routes/products'));
 
 const PORT = process.env.PORT || 5000;
 

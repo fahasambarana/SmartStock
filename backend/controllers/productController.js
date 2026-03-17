@@ -4,18 +4,55 @@ const Zone = require('../models/Zone');
 // Create a new product
 exports.createProduct = async (req, res) => {
   try {
-    const { name, category, price, quantity, ZoneId, expirationDate } = req.body;
+    const { name, category, price, quantity, ZoneId, expirationDate, volume_unitaire } = req.body;
     
     // Convert empty string expirationDate to null for DB compliance
     const validExpiration = expirationDate ? expirationDate : null;
 
+    if (ZoneId) {
+      const zone = await Zone.findByPk(ZoneId);
+      if (!zone) {
+        return res.status(404).json({ message: 'Zone not found' });
+      }
+
+      // Logic validation Capacity: 
+      // If "Unités", calculation ignores volume and compares quantities.
+      // If "Volume", (Volume_unitaire * Quantité_entrante) + capacite_actuelle <= capacite_max.
+      const impact = zone.unite_capacite === 'Volume' 
+        ? (parseFloat(volume_unitaire) || 0) * parseInt(quantity)
+        : parseInt(quantity);
+
+      if ((parseFloat(zone.capacite_actuelle) || 0) + impact > parseFloat(zone.capacite_max)) {
+        return res.status(400).json({ message: `Action Impossible : Saturation de l'espace [${zone.name}]` });
+      }
+
+      // Create product
+      const product = await Product.create({ 
+        name, 
+        category, 
+        price, 
+        quantity: parseInt(quantity) || 0, 
+        ZoneId: ZoneId, 
+        expirationDate: validExpiration,
+        volume_unitaire: parseFloat(volume_unitaire) || 0
+      });
+
+      // Update zone capacity
+      zone.capacite_actuelle = (parseFloat(zone.capacite_actuelle) || 0) + impact;
+      await zone.save();
+
+      return res.status(201).json(product);
+    }
+
+    // Product without zone
     const product = await Product.create({ 
       name, 
       category, 
       price, 
-      quantity, 
-      ZoneId: ZoneId || null, 
-      expirationDate: validExpiration 
+      quantity: parseInt(quantity) || 0, 
+      ZoneId: null, 
+      expirationDate: validExpiration,
+      volume_unitaire: parseFloat(volume_unitaire) || 0
     });
     
     res.status(201).json(product);

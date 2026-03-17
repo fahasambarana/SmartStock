@@ -12,7 +12,7 @@ const Product = sequelize.define('Product', {
     allowNull: false,
   },
   category: {
-    type: DataTypes.ENUM('Food', 'Electronics', 'Cosmetics', 'Other'),
+    type: DataTypes.ENUM('Alimentaire', 'Food', 'Electronics', 'Cosmetics', 'Other'),
     allowNull: false,
     defaultValue: 'Other',
   },
@@ -36,6 +36,11 @@ const Product = sequelize.define('Product', {
   expirationDate: {
     type: DataTypes.DATEONLY,
     allowNull: true,
+  },
+  volume_unitaire: {
+    type: DataTypes.FLOAT,
+    allowNull: false,
+    defaultValue: 0,
   },
 });
 
