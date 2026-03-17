@@ -1,20 +1,24 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { login as apiLogin } from '../services/api';
 
 const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [role, setRole] = useState('Employee');
   const navigate = useNavigate();
   const { login } = useAuth();
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    // TODO: Implement login logic
-    console.log('Login:', { email, password, role });
-    login('dummy-token', role);
-    navigate('/dashboard');
+    try {
+      const response = await apiLogin({ email, password });
+      login(response.data.token, response.data.role);
+      navigate('/dashboard');
+    } catch (error) {
+      console.error('Login failed:', error);
+      // TODO: Show error message
+    }
   };
 
   return (
@@ -59,24 +63,6 @@ const Login = () => {
                 onChange={(e) => setPassword(e.target.value)}
               />
             </div>
-          </div>
-
-          <div>
-            <label htmlFor="role" className="block text-sm font-medium text-gray-700">
-              Rôle
-            </label>
-            <select
-              id="role"
-              name="role"
-              value={role}
-              onChange={(e) => setRole(e.target.value)}
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
-            >
-              <option value="Admin">Administrateur</option>
-              <option value="Manager">Gestionnaire</option>
-              <option value="Employee">Employé</option>
-              <option value="Viewer">Observateur</option>
-            </select>
           </div>
 
           <div>

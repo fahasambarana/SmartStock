@@ -8,13 +8,13 @@ const Sidebar = () => {
   const { user } = useAuth();
 
   const allMenuItems = [
-    { name: 'Tableau de Bord', path: '/dashboard', icon: FiHome, roles: ['Admin', 'Manager', 'Employee', 'Viewer'] },
-    { name: 'Zones', path: '/zones', icon: FiMapPin, roles: ['Admin', 'Manager'] },
-    { name: 'Produits', path: '/products', icon: FiPackage, roles: ['Admin', 'Manager', 'Employee'] },
-    { name: 'Mouvements de Stock', path: '/movements', icon: FiTruck, roles: ['Admin', 'Manager', 'Employee'] },
-    { name: 'Alertes', path: '/alerts', icon: FiAlertTriangle, roles: ['Admin', 'Manager', 'Employee', 'Viewer'] },
-    { name: 'Utilisateurs', path: '/users', icon: FiUsers, roles: ['Admin'] },
-    { name: 'Paramètres', path: '/settings', icon: FiSettings, roles: ['Admin'] },
+    { name: 'Tableau de Bord', path: '/dashboard', icon: FiHome, roles: ['admin', 'manager', 'utilisateur', 'fournisseur'] },
+    { name: 'Zones', path: '/zones', icon: FiMapPin, roles: ['admin', 'manager'] },
+    { name: 'Produits', path: '/products', icon: FiPackage, roles: ['admin', 'manager', 'utilisateur'] },
+    { name: 'Mouvements de Stock', path: '/movements', icon: FiTruck, roles: ['admin', 'manager', 'utilisateur'] },
+    { name: 'Alertes', path: '/alerts', icon: FiAlertTriangle, roles: ['admin', 'manager', 'utilisateur', 'fournisseur'] },
+    { name: 'Utilisateurs', path: '/users', icon: FiUsers, roles: ['admin'] },
+    { name: 'Paramètres', path: '/settings', icon: FiSettings, roles: ['admin'] },
   ];
 
   const menuItems = allMenuItems.filter(item => item.roles.includes(user?.role));

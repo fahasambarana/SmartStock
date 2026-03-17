@@ -8,19 +8,15 @@ export const useAuth = () => {
 };
 
 export const AuthProvider = ({ children }) => {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [user, setUser] = useState(null);
-
-  useEffect(() => {
+  const [isAuthenticated, setIsAuthenticated] = useState(() => {
     const token = localStorage.getItem('token');
     const role = localStorage.getItem('role');
-    if (token && role) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setIsAuthenticated(true);
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setUser({ role });
-    }
-  }, []);
+    return !!(token && role);
+  });
+  const [user, setUser] = useState(() => {
+    const role = localStorage.getItem('role');
+    return role ? { role } : null;
+  });
 
   const login = (token, role = 'Employee') => {
     localStorage.setItem('token', token);
