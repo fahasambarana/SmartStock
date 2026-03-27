@@ -35,7 +35,7 @@ const Zones = () => {
     { key: 'type', label: 'Type' },
     { key: 'unite_capacite', label: 'Unité' },
     { key: 'capacite_max', label: 'Cap. Max' },
-    { key: 'capacite_type', label: 'Cap. Type' },
+    // { key: 'capacite_type', label: 'Cap. Type' },
     { key: 'capacite_actuelle', label: 'Utilisée' },
   ];
 
@@ -237,7 +237,7 @@ const Zones = () => {
               />
             </div>
           </div>
-          <div>
+          {/* <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Capacité Type</label>
             <input
               type="number"
@@ -248,7 +248,7 @@ const Zones = () => {
               className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
               placeholder="0.00"
             />
-          </div>
+          </div> */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Type de Zone</label>
             <select
