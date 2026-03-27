@@ -14,11 +14,12 @@ const Products = () => {
   const [editingProduct, setEditingProduct] = useState(null);
   const [formData, setFormData] = useState({
     name: '',
-    category: 'Food',
+    category: 'Alimentaire',
     price: '',
     quantity: '',
     ZoneId: '',
     expirationDate: '',
+    volume_unitaire: '',
   });
   const [searchTerm, setSearchTerm] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -60,11 +61,12 @@ const Products = () => {
     setEditingProduct(null);
     setFormData({
       name: '',
-      category: 'Food',
+      category: 'Alimentaire',
       price: '',
       quantity: '',
       ZoneId: '',
       expirationDate: '',
+      volume_unitaire: '',
     });
     setIsModalOpen(true);
   };
@@ -78,6 +80,7 @@ const Products = () => {
       quantity: product.quantity,
       ZoneId: product.ZoneId || '',
       expirationDate: product.expirationDate || '',
+      volume_unitaire: product.volume_unitaire || '',
     });
     setIsModalOpen(true);
   };
@@ -101,7 +104,8 @@ const Products = () => {
     // Parse empty strings to null for relations
     const finalData = {
       ...formData,
-      ZoneId: formData.ZoneId === '' ? null : formData.ZoneId
+      ZoneId: formData.ZoneId === '' ? null : formData.ZoneId,
+      volume_unitaire: formData.volume_unitaire === '' ? 0 : parseFloat(formData.volume_unitaire)
     };
 
     try {
@@ -205,7 +209,8 @@ const Products = () => {
               onChange={(e) => setFormData({ ...formData, category: e.target.value })}
               className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
             >
-              <option value="Food">Alimentation</option>
+              <option value="Alimentaire">Alimentation</option>
+              <option value="Food">Food (Legacy)</option>
               <option value="Electronics">Électronique</option>
               <option value="Cosmetics">Cosmétiques</option>
               <option value="Other">Autre</option>
@@ -238,6 +243,20 @@ const Products = () => {
               />
             </div>
           </div>
+          {formData.ZoneId && availableZones.find(z => z.id === parseInt(formData.ZoneId))?.unite_capacite === 'Volume' && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Volume Unitaire (m³)</label>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                value={formData.volume_unitaire}
+                onChange={(e) => setFormData({ ...formData, volume_unitaire: e.target.value })}
+                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                placeholder="0.00"
+              />
+            </div>
+          )}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Zone de Stockage</label>
             <select
@@ -253,7 +272,7 @@ const Products = () => {
               ))}
             </select>
           </div>
-          {formData.category === 'Food' && (
+          {(formData.category === 'Alimentaire' || formData.category === 'Food') && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Date d'Expiration</label>
               <input

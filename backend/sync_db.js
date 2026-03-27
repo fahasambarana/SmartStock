@@ -8,10 +8,10 @@ const Zone = require('./models/Zone');
 Zone.hasMany(Product, { foreignKey: 'ZoneId' });
 Product.belongsTo(Zone, { foreignKey: 'ZoneId' });
 
-async function syncProduct() {
+async function syncDB() {
   try {
-    console.log('Syncing Product table...');
-    await Product.sync({ alter: true });
+    console.log('Syncing database...');
+    await sequelize.sync({ alter: true });
     console.log('Sync complete.');
   } catch(error) {
     console.error('Error syncing:', error);
@@ -20,4 +20,4 @@ async function syncProduct() {
   }
 }
 
-syncProduct();
+syncDB();

@@ -20,6 +20,30 @@ const Zone = sequelize.define('Zone', {
     type: DataTypes.STRING,
     allowNull: true,
   },
+  capacite_max: {
+    type: DataTypes.FLOAT,
+    allowNull: false,
+    defaultValue: 0,
+  },
+  capacite_actuelle: {
+    type: DataTypes.FLOAT,
+    allowNull: false,
+    defaultValue: 0,
+  },
+  type: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  unite_capacite: {
+    type: DataTypes.ENUM('Volume', 'Unités', 'Poids', 'Surface'),
+    allowNull: false,
+    defaultValue: 'Unités',
+  },
+  capacite_type: {
+    type: DataTypes.FLOAT,
+    allowNull: true,
+    defaultValue: 0,
+  },
 });
 
 module.exports = Zone;
