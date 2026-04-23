@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
-import Table from '../components/Table';
 import Modal from '../components/Modal';
-import { FiPlus, FiAlertCircle } from 'react-icons/fi';
+import { FiPlus, FiAlertCircle, FiEdit2, FiTrash2, FiSearch, FiPackage } from 'react-icons/fi';
 import { useAuth } from '../contexts/AuthContext';
 import { getProducts, createProduct, updateProduct, deleteProduct, getZones } from '../services/api';
 
@@ -25,15 +24,11 @@ const Products = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { user } = useAuth();
 
-  const canEdit = user?.role === 'Admin' || user?.role === 'Manager';
-
-  const columns = [
-    { key: 'name', label: 'Nom du Produit' },
-    { key: 'category', label: 'Catégorie' },
-    { key: 'price', label: 'Prix' },
-    { key: 'quantity', label: 'Quantité' },
-    { key: 'storageZone', label: 'Zone de Stockage' },
-  ];
+  // --- STYLES NEUMORPHISMES DYNAMIQUES (DARK MODE READY) ---
+  const nmBg = "bg-[#e0e5ec] dark:bg-[#1a1d23]";
+  const nmFlat = "bg-[#e0e5ec] dark:bg-[#1a1d23] shadow-[9px_9px_16px_rgb(163,177,198,0.6),-9px_-9px_16px_rgba(255,255,255,0.5)] dark:shadow-[6px_6px_12px_#0e1013,-6px_-6px_12px_rgba(255,255,255,0.05)]";
+  const nmInset = "bg-[#e0e5ec] dark:bg-[#1a1d23] shadow-[inset_6px_6px_12px_#b8b9be,inset_-6px_-6px_12px_#ffffff] dark:shadow-[inset_4px_4px_8px_#0e1013,inset_-4px_-4px_8px_rgba(255,255,255,0.05)]";
+  const nmButton = "active:shadow-[inset_4px_4px_8px_#b8b9be,inset_-4px_-4px_8px_#ffffff] dark:active:shadow-[inset_3px_3px_6px_#0e1013,inset_-3px_-3px_6px_rgba(255,255,255,0.05)] transition-all duration-200";
 
   useEffect(() => {
     fetchData();
@@ -42,16 +37,12 @@ const Products = () => {
   const fetchData = async () => {
     try {
       setIsLoading(true);
-      const [productsRes, zonesRes] = await Promise.all([
-        getProducts(),
-        getZones()
-      ]);
+      const [productsRes, zonesRes] = await Promise.all([getProducts(), getZones()]);
       setProducts(productsRes.data);
       setAvailableZones(zonesRes.data);
       setError(null);
     } catch (err) {
       setError('Erreur lors du chargement des données');
-      console.error(err);
     } finally {
       setIsLoading(false);
     }
@@ -59,15 +50,7 @@ const Products = () => {
 
   const handleAdd = () => {
     setEditingProduct(null);
-    setFormData({
-      name: '',
-      category: 'Alimentaire',
-      price: '',
-      quantity: '',
-      ZoneId: '',
-      expirationDate: '',
-      volume_unitaire: '',
-    });
+    setFormData({ name: '', category: 'Food', price: '', quantity: '', ZoneId: '', expirationDate: '' });
     setIsModalOpen(true);
   };
 
@@ -86,13 +69,12 @@ const Products = () => {
   };
 
   const handleDelete = async (product) => {
-    if (window.confirm(`Êtes-vous sûr de vouloir supprimer le produit "${product.name}" ?`)) {
+    if (window.confirm(`Supprimer le produit "${product.name}" ?`)) {
       try {
         await deleteProduct(product.id);
-        fetchData(); // Refresh the list
+        fetchData();
       } catch (err) {
-        alert('Erreur lors de la suppression du produit');
-        console.error(err);
+        alert('Erreur lors de la suppression');
       }
     }
   };
@@ -100,25 +82,14 @@ const Products = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
-    
-    // Parse empty strings to null for relations
-    const finalData = {
-      ...formData,
-      ZoneId: formData.ZoneId === '' ? null : formData.ZoneId,
-      volume_unitaire: formData.volume_unitaire === '' ? 0 : parseFloat(formData.volume_unitaire)
-    };
+    const finalData = { ...formData, ZoneId: formData.ZoneId === '' ? null : formData.ZoneId };
 
     try {
-      if (editingProduct) {
-        await updateProduct(editingProduct.id, finalData);
-      } else {
-        await createProduct(finalData);
-      }
+      editingProduct ? await updateProduct(editingProduct.id, finalData) : await createProduct(finalData);
       setIsModalOpen(false);
-      fetchData(); // Refresh the list
+      fetchData();
     } catch (err) {
-      alert(err.response?.data?.message || 'Erreur lors de l\'enregistrement du produit');
-      console.error(err);
+      alert(err.response?.data?.message || 'Erreur lors de l\'enregistrement');
     } finally {
       setIsSubmitting(false);
     }
@@ -128,183 +99,198 @@ const Products = () => {
     product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     product.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
     (product.Zone && product.Zone.name.toLowerCase().includes(searchTerm.toLowerCase()))
-  ).map(product => ({
-    ...product,
-    storageZone: product.Zone ? product.Zone.name : 'Aucune'
-  }));
+  );
 
   if (isLoading) {
     return (
-      <div className="p-6 flex justify-center items-center h-full">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      <div className={`min-h-screen ${nmBg} flex justify-center items-center transition-colors duration-300`}>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-4 border-blue-500"></div>
       </div>
     );
   }
 
   return (
-    <div className="p-6">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-gray-800">Produits</h1>
+    <div className={`min-h-screen ${nmBg} p-8 text-gray-700 dark:text-gray-200 transition-colors duration-300`}>
+      {/* Header */}
+      <div className="flex flex-col md:flex-row justify-between items-center mb-10 gap-4">
+        <h1 className="text-3xl font-extrabold text-[#44474a] dark:text-gray-100 flex items-center tracking-tighter uppercase ">
+          <FiPackage className="mr-3 text-blue-500 dark:text-blue-400" /> Produits
+        </h1>
         <button
           onClick={handleAdd}
-          className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 flex items-center transition-colors shadow-sm"
+          className={`${nmFlat} ${nmButton} px-6 py-3 rounded-xl flex items-center font-bold text-blue-600 dark:text-blue-400`}
         >
-          <FiPlus className="w-5 h-5 mr-2" />
-          Ajouter un Produit
+          <FiPlus className="mr-2 stroke-[3px]" /> Ajouter un Produit
         </button>
       </div>
 
+      {/* Barre de recherche */}
+      <div className={`${nmInset} flex items-center px-5 py-3 rounded-2xl mb-8`}>
+        <FiSearch className="text-gray-400 dark:text-gray-500 mr-3" />
+        <input
+          type="text"
+          placeholder="Rechercher un produit, une catégorie..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="bg-transparent w-full outline-none text-gray-600 dark:text-gray-300 placeholder-gray-400"
+        />
+      </div>
+
       {error && (
-        <div className="mb-4 bg-red-50 text-red-700 p-4 rounded-md flex items-center shadow-sm">
-          <FiAlertCircle className="w-5 h-5 mr-2 text-red-500" />
-          {error}
+        <div className={`${nmFlat} p-4 rounded-xl mb-6 flex items-center text-red-500 font-medium`}>
+          <FiAlertCircle className="mr-2" /> {error}
         </div>
       )}
 
-      <div className="mb-4">
-        <input
-          type="text"
-          placeholder="Rechercher des produits..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 transition-colors shadow-sm"
-        />
-      </div>
-
-      <div className="bg-white rounded-lg shadow overflow-hidden">
-        <Table
-          columns={columns}
-          data={filteredProducts}
-          onEdit={handleEdit}
-          onDelete={handleDelete}
-        />
-        {filteredProducts.length === 0 && !error && (
-          <div className="p-8 text-center text-gray-500">
-            Aucun produit trouvé.
-          </div>
+      {/* Table Neumorphique */}
+      <div className={`${nmFlat} rounded-3xl overflow-hidden`}>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="border-b border-gray-300/40 dark:border-white/5">
+                <th className="p-5 font-bold text-gray-500 dark:text-gray-400 uppercase text-xs">Produit</th>
+                <th className="p-5 font-bold text-gray-500 dark:text-gray-400 uppercase text-xs">Catégorie</th>
+                <th className="p-5 font-bold text-gray-500 dark:text-gray-400 uppercase text-xs">Prix</th>
+                <th className="p-5 font-bold text-gray-500 dark:text-gray-400 uppercase text-xs">Quantité</th>
+                <th className="p-5 font-bold text-gray-500 dark:text-gray-400 uppercase text-xs">Zone</th>
+                <th className="p-5 font-bold text-gray-500 dark:text-gray-400 uppercase text-xs text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredProducts.map((product) => (
+                <tr key={product.id} className="hover:bg-white/20 dark:hover:bg-white/5 transition-colors">
+                  <td className="p-5 font-semibold text-gray-800 dark:text-gray-200">{product.name}</td>
+                  <td className="p-5">
+                    <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase bg-gray-200 dark:bg-[#252a33] text-gray-600 dark:text-gray-400 shadow-sm">
+                      {product.category}
+                    </span>
+                  </td>
+                  <td className="p-5 font-mono dark:text-gray-300">{product.price} €</td>
+                  <td className="p-5">
+                    <span className={`font-bold ${product.quantity < 5 ? 'text-red-500 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>
+                      {product.quantity}
+                    </span>
+                  </td>
+                  <td className="p-5 text-gray-500 dark:text-gray-400 text-sm italic">
+                    {product.Zone ? product.Zone.name : 'Non assigné'}
+                  </td>
+                  <td className="p-5 text-right">
+                    <div className="flex justify-end gap-3">
+                      <button onClick={() => handleEdit(product)} className={`${nmFlat} ${nmButton} p-2 rounded-lg text-amber-600 dark:text-amber-500`}>
+                        <FiEdit2 size={16} />
+                      </button>
+                      <button onClick={() => handleDelete(product)} className={`${nmFlat} ${nmButton} p-2 rounded-lg text-red-500 dark:text-red-400`}>
+                        <FiTrash2 size={16} />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        {filteredProducts.length === 0 && (
+          <div className="p-10 text-center text-gray-400 italic">Aucun produit trouvé.</div>
         )}
       </div>
 
+      {/* Modal Neumorphique */}
       <Modal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        title={editingProduct ? 'Modifier le Produit' : 'Ajouter un Produit'}
+        title={editingProduct ? 'Modifier le Produit' : 'Nouveau Produit'}
       >
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-5 p-2">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Nom du Produit <span className="text-red-500">*</span></label>
+            <label className="block text-xs font-bold uppercase text-gray-500 dark:text-gray-400 mb-2 ml-1">Nom du Produit</label>
             <input
               type="text"
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-              placeholder="Ex: Ordinateur Portable"
+              className={`${nmInset} w-full p-3 rounded-xl outline-none focus:text-blue-600 dark:focus:text-blue-400 text-gray-700 dark:text-gray-200 transition-all`}
+              placeholder="Ex: iPhone 15"
               required
             />
           </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Catégorie</label>
-            <select
-              value={formData.category}
-              onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-            >
-              <option value="Alimentaire">Alimentation</option>
-              <option value="Food">Food (Legacy)</option>
-              <option value="Electronics">Électronique</option>
-              <option value="Cosmetics">Cosmétiques</option>
-              <option value="Other">Autre</option>
-            </select>
-          </div>
+
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Prix <span className="text-red-500">*</span></label>
+              <label className="block text-xs font-bold uppercase text-gray-500 dark:text-gray-400 mb-2 ml-1">Catégorie</label>
+              <select
+                value={formData.category}
+                onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                className={`${nmInset} w-full p-3 rounded-xl outline-none bg-transparent text-gray-700 dark:text-gray-200`}
+              >
+                <option value="Food" className="dark:bg-[#1a1d23]">Alimentation</option>
+                <option value="Electronics" className="dark:bg-[#1a1d23]">Électronique</option>
+                <option value="Cosmetics" className="dark:bg-[#1a1d23]">Cosmétiques</option>
+                <option value="Other" className="dark:bg-[#1a1d23]">Autre</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-bold uppercase text-gray-500 dark:text-gray-400 mb-2 ml-1">Zone</label>
+              <select
+                value={formData.ZoneId}
+                onChange={(e) => setFormData({ ...formData, ZoneId: e.target.value })}
+                className={`${nmInset} w-full p-3 rounded-xl outline-none bg-transparent text-gray-700 dark:text-gray-200`}
+              >
+                <option value="" className="dark:bg-[#1a1d23]">Sélectionner...</option>
+                {availableZones.map(zone => (
+                  <option key={zone.id} value={zone.id} className="dark:bg-[#1a1d23]">{zone.name}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-bold uppercase text-gray-500 dark:text-gray-400 mb-2 ml-1">Prix (€)</label>
               <input
-                type="number"
-                step="0.01"
-                min="0"
+                type="number" step="0.01"
                 value={formData.price}
                 onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                placeholder="0.00"
+                className={`${nmInset} w-full p-3 rounded-xl outline-none text-gray-700 dark:text-gray-200`}
                 required
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Quantité <span className="text-red-500">*</span></label>
+              <label className="block text-xs font-bold uppercase text-gray-500 dark:text-gray-400 mb-2 ml-1">Quantité</label>
               <input
                 type="number"
-                min="0"
                 value={formData.quantity}
                 onChange={(e) => setFormData({ ...formData, quantity: e.target.value })}
-                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                placeholder="0"
+                className={`${nmInset} w-full p-3 rounded-xl outline-none text-gray-700 dark:text-gray-200`}
                 required
               />
             </div>
           </div>
-          {formData.ZoneId && availableZones.find(z => z.id === parseInt(formData.ZoneId))?.unite_capacite === 'Volume' && (
+
+          {formData.category === 'Food' && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Volume Unitaire (m³)</label>
-              <input
-                type="number"
-                step="0.01"
-                min="0"
-                value={formData.volume_unitaire}
-                onChange={(e) => setFormData({ ...formData, volume_unitaire: e.target.value })}
-                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                placeholder="0.00"
-              />
-            </div>
-          )}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Zone de Stockage</label>
-            <select
-              value={formData.ZoneId}
-              onChange={(e) => setFormData({ ...formData, ZoneId: e.target.value })}
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-            >
-              <option value="">-- Sélectionnez une Zone --</option>
-              {availableZones.map(zone => (
-                <option key={zone.id} value={zone.id}>
-                  {zone.name} {zone.location ? `(${zone.location})` : ''}
-                </option>
-              ))}
-            </select>
-          </div>
-          {(formData.category === 'Alimentaire' || formData.category === 'Food') && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Date d'Expiration</label>
+              <label className="block text-xs font-bold uppercase text-gray-500 dark:text-gray-400 mb-2 ml-1">Date d'Expiration</label>
               <input
                 type="date"
                 value={formData.expirationDate}
                 onChange={(e) => setFormData({ ...formData, expirationDate: e.target.value })}
-                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                className={`${nmInset} w-full p-3 rounded-xl outline-none text-gray-700 dark:text-gray-200`}
               />
             </div>
           )}
-          <div className="flex justify-end space-x-3 pt-4 border-t border-gray-100">
+
+          <div className="flex justify-end gap-4 pt-6">
             <button
               type="button"
               onClick={() => setIsModalOpen(false)}
-              disabled={isSubmitting}
-              className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
+              className={`${nmFlat} ${nmButton} px-6 py-2 rounded-xl text-gray-500 dark:text-gray-400 font-bold`}
             >
               Annuler
             </button>
             <button
               type="submit"
               disabled={isSubmitting}
-              className="px-4 py-2 border border-transparent rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 flex items-center transition-colors"
+              className={`${nmFlat} ${nmButton} px-8 py-2 rounded-xl text-blue-600 dark:text-blue-400 font-bold disabled:opacity-50`}
             >
-              {isSubmitting ? (
-                 <span className="flex items-center">
-                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                   Enregistrement...
-                 </span>
-              ) : (
-                editingProduct ? 'Modifier' : 'Ajouter'
-              )}
+              {isSubmitting ? '...' : (editingProduct ? 'Modifier' : 'Ajouter')}
             </button>
           </div>
         </form>
