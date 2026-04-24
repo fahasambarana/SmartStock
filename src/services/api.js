@@ -19,6 +19,15 @@ api.interceptors.request.use(
     return Promise.reject(error);
   }
 );
+// Mouvements de stock
+export const getMovements = () => api.get('/movements');
+export const getMovementsByType = (type) => api.get(`/movements/type/${type}`);
+export const getMovementStats = () => api.get('/movements/stats');
+export const getMovementById = (id) => api.get(`/movements/${id}`);
+export const createInMovement = (data) => api.post('/movements/in', data);
+export const createOutMovement = (data) => api.post('/movements/out', data);
+export const createTransferMovement = (data) => api.post('/movements/transfer', data);
+export const cancelMovement = (id) => api.put(`/movements/${id}/cancel`);
 
 // Gestion des produits
 export const getProducts = () => api.get('/products');
@@ -33,8 +42,8 @@ export const updateZone = (id, zone) => api.put(`/zones/${id}`, zone);
 export const deleteZone = (id) => api.delete(`/zones/${id}`);
 
 // Gestion des mouvements
-export const getMovements = () => api.get('/movements');
-export const createMovement = (movement) => api.post('/movements', movement);
+//export const getMovements = () => api.get('/movements');
+//export const createMovement = (movement) => api.post('/movements', movement);
 
 // Gestion des alertes
 export const getAlerts = () => api.get('/alerts');
