@@ -191,9 +191,9 @@ const InventoryCalendar = () => {
 
               {/* Métadonnées */}
               <div className="text-center text-xs text-gray-400 pt-4 border-t border-gray-200 dark:border-gray-700">
-                📅 Généré le {new Date(inventory.generatedAt).toLocaleString('fr-FR')} | 
-                📊 Période: {inventory.period} |
-                🤖 Analyse IA v1.0
+                 Généré le {new Date(inventory.generatedAt).toLocaleString('fr-FR')} | 
+                Période: {inventory.period} |
+               Analyse IA v1.0
               </div>
             </div>
           ) : (
