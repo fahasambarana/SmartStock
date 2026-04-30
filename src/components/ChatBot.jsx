@@ -1,6 +1,5 @@
-// components/ChatBot.jsx
 import React, { useState, useRef, useEffect } from 'react';
-import { FiSend, FiX, FiCpu, FiUser, FiHelpCircle, FiMinimize2 } from 'react-icons/fi';
+import { FiSend, FiX, FiCpu, FiUser, FiHelpCircle, FiMinimize2, FiMessageSquare } from 'react-icons/fi';
 import { sendChatMessage, getChatSuggestions } from '../services/api';
 
 const ChatBot = ({ onClose }) => {
@@ -126,7 +125,7 @@ const ChatBot = ({ onClose }) => {
   }
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="h-full flex flex-col bg-[#e0e5ec] dark:bg-[#1a1d23] rounded-2xl">
       {/* Header */}
       <div className={`${nmInset} p-4 flex justify-between items-center border-b border-gray-300/20 rounded-t-2xl`}>
         <div className="flex items-center gap-3">
