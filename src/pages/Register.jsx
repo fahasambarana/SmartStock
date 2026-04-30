@@ -91,11 +91,9 @@ const Register = () => {
           ) : (
             <form className="space-y-4" onSubmit={handleSubmit}>
               <div className="space-y-3">
-                <input type="text" required className="w-full px-6 py-4 bg-[#e0e0e0] rounded-full shadow-[inset_6px_6px_12px_#bebebe,inset_-6px_-6px_12px_#ffffff] outline-none text-gray-700" placeholder="Utilisateur" value={username} onChange={(e) => setUsername(e.target.value)} />
+                <input type="text" required className="w-full px-6 py-4 bg-[#e0e0e0] rounded-full shadow-[inset_6px_6px_12px_#bebebe,inset_-6px_-6px_12px_#ffffff] outline-none text-gray-700" placeholder="Nom d'utilisateur" value={username} onChange={(e) => setUsername(e.target.value)} />
                 <input type="email" required className="w-full px-6 py-4 bg-[#e0e0e0] rounded-full shadow-[inset_6px_6px_12px_#bebebe,inset_-6px_-6px_12px_#ffffff] outline-none text-gray-700" placeholder="E-mail" value={email} onChange={(e) => setEmail(e.target.value)} />
                 <select className="w-full px-6 py-4 bg-[#e0e0e0] rounded-full shadow-[inset_6px_6px_12px_#bebebe,inset_-6px_-6px_12px_#ffffff] outline-none text-gray-700 appearance-none cursor-pointer" value={role} onChange={(e) => setRole(e.target.value)}>
-                  <option value="utilisateur">Utilisateur</option>
-                  <option value="fournisseur">Fournisseur</option>
                   <option value="manager">Manager</option>
                   <option value="admin">Admin</option>
                 </select>

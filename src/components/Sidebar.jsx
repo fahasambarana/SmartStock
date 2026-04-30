@@ -93,13 +93,6 @@ const Sidebar = () => {
                     >
                       <item.icon className={`w-5 h-5 mr-4 transition-colors ${isActive ? 'text-blue-600 dark:text-blue-400' : 'group-hover:text-blue-500'}`} />
                       <span className="font-semibold text-sm tracking-tight">{item.name}</span>
-                      
-                      {/* Badge de nouveauté pour Calendrier Inventaire */}
-                      {item.name === 'Calendrier Inventaire' && (
-                        <span className="ml-auto text-[9px] font-black px-2 py-0.5 rounded-full bg-green-500 text-white">
-                          NEW
-                        </span>
-                      )}
                     </motion.div>
                   </Link>
                 </motion.li>
