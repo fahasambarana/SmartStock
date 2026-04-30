@@ -21,7 +21,6 @@ const Sidebar = () => {
     // NOUVEAU : Rapports PDF (Admin & Manager)
     { name: 'Rapports PDF', path: '/reports', icon: FiFileText, roles: ['admin', 'manager'] },
     { name: 'Utilisateurs', path: '/users', icon: FiUsers, roles: ['admin'] },
-    { name: 'Paramètres', path: '/settings', icon: FiSettings, roles: ['admin'] },
   ];
 
   // Filtrer les menus selon le rôle de l'utilisateur

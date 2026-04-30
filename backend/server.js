@@ -11,6 +11,7 @@ const aiAlertRoutes = require('./routes/aiAlerts');
 const dashboardRoutes = require('./routes/dashboardRoutes');
 const chatRoutes = require('./routes/chatRoutes');
 const reportRoutes = require('./routes/reportRoutes');
+const inventoryCalendarRoutes = require('./routes/inventoryCalendarRoutes');
 
 const Product = require('./models/Product');
 const Zone = require('./models/Zone');
@@ -38,11 +39,12 @@ app.use('/api/ai-alerts', aiAlertRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/reports', reportRoutes);
+app.use('/api/inventory-calendar', inventoryCalendarRoutes);
 
 const PORT = process.env.PORT || 5000;
 
 // Synchronisation sans le modèle Movement
-sequelize.sync({ alter: true })
+sequelize.sync()
   .then(() => {
     console.log('✅ Base de données synchronisée');
     
