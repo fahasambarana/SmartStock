@@ -1,3 +1,4 @@
+// server.js - Version corrigée
 const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
@@ -16,7 +17,6 @@ const inventoryCalendarRoutes = require('./routes/inventoryCalendarRoutes');
 const Product = require('./models/Product');
 const Zone = require('./models/Zone');
 const User = require('./models/User');
-// Ne pas importer Movement ici pour éviter la création automatique
 
 // DB Relations
 Zone.hasMany(Product, { foreignKey: 'ZoneId' });
@@ -25,7 +25,19 @@ Product.belongsTo(Zone, { foreignKey: 'ZoneId' });
 dotenv.config();
 
 const app = express();
-app.use(cors());
+
+// ✅ CONFIGURATION CORS COMPLÈTE
+app.use(cors({
+  origin: ['http://localhost:3000', 'http://127.0.0.1:3000', 'http://localhost:5173', 'http://127.0.0.1:5173'],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
+  exposedHeaders: ['Content-Disposition']
+}));
+
+// ✅ Support explicite pour OPTIONS preflight
+app.options('*', cors());
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -41,9 +53,14 @@ app.use('/api/chat', chatRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/inventory-calendar', inventoryCalendarRoutes);
 
+// ✅ Route de test CORS
+app.get('/api/test-cors', (req, res) => {
+  res.json({ message: 'CORS is working!' });
+});
+
 const PORT = process.env.PORT || 5000;
 
-// Synchronisation sans le modèle Movement
+// Synchronisation
 sequelize.sync()
   .then(() => {
     console.log('✅ Base de données synchronisée');
@@ -55,9 +72,7 @@ sequelize.sync()
       console.log(`   - POST   /api/auth/login`);
       console.log(`   - GET    /api/users`);
       console.log(`   - GET    /api/movements`);
-      console.log(`   - POST   /api/movements/in`);
-      console.log(`   - POST   /api/movements/out`);
-      console.log(`   - POST   /api/movements/transfer`);
+      console.log(`   - GET    /api/reports/inventory/pdf`);
     });
   })
   .catch(err => {
