@@ -2,12 +2,33 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 
+const ALLOWED_ROLES = ['admin', 'manager', 'utilisateur', 'fournisseur'];
+
 exports.register = async (req, res) => {
   try {
     const { username, email, password, role } = req.body;
-    console.log('Register attempt:', { username, email, role });
+
+    if (!username || !email || !password) {
+      return res.status(400).json({ message: 'Username, email and password are required' });
+    }
+
+    if (role && !ALLOWED_ROLES.includes(role)) {
+      return res.status(400).json({ message: 'Invalid role selected' });
+    }
+
+    const existingUser = await User.findOne({ where: { email } });
+    if (existingUser) {
+      return res.status(409).json({ message: 'Email already in use' });
+    }
+
     const hashedPassword = await bcrypt.hash(password, 10);
-    const user = await User.create({ username, email, password: hashedPassword, role: role || 'user' });
+    await User.create({
+      username,
+      email,
+      password: hashedPassword,
+      role: role || 'utilisateur',
+    });
+
     res.status(201).json({ message: 'User registered successfully' });
   } catch (error) {
     console.error('Registration error:', error);
