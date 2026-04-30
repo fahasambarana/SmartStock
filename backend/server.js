@@ -10,6 +10,7 @@ const movementRoutes = require('./routes/movementRoutes');
 const aiAlertRoutes = require('./routes/aiAlerts');
 const dashboardRoutes = require('./routes/dashboardRoutes');
 const chatRoutes = require('./routes/chatRoutes');
+const reportRoutes = require('./routes/reportRoutes');
 
 const Product = require('./models/Product');
 const Zone = require('./models/Zone');
@@ -36,6 +37,7 @@ app.use('/api/movements', movementRoutes);
 app.use('/api/ai-alerts', aiAlertRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/chat', chatRoutes);
+app.use('/api/reports', reportRoutes);
 
 const PORT = process.env.PORT || 5000;
 
