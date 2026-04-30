@@ -20,14 +20,14 @@ const Modal = ({ isOpen, onClose, title, children }) => {
   return (
     <AnimatePresence>
       {isOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[100]  flex items-center justify-center p-4">
           {/* Background Overlay avec flou subtil */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
-            className="absolute inset-0 bg-gray-500/20 backdrop-blur-sm"
+            className="absolute inset-0 bg-gray-500/20 backdrop-blur-sm "
           />
 
           {/* Fenêtre Modal Neumorphique */}
@@ -35,7 +35,7 @@ const Modal = ({ isOpen, onClose, title, children }) => {
             initial={{ scale: 0.9, opacity: 0, y: 20 }}
             animate={{ scale: 1, opacity: 1, y: 0 }}
             exit={{ scale: 0.9, opacity: 0, y: 20 }}
-            className="relative bg-[#e0e5ec] rounded-[2.5rem] shadow-[20px_20px_60px_#babecc,-20px_-20px_60px_#ffffff] max-w-md w-full overflow-hidden border border-white/20"
+            className="relative bg-[#e0e5ec] dark:bg-[#1a1d23] rounded-[2.5rem] shadow-[20px_20px_60px_#babecc,-20px_-20px_60px_#ffffff] dark:shadow-[6px_6px_12px_#0e1013,-6px_-6px_12px_rgba(255,255,255,0.05)] max-w-md w-full overflow-hidden border border-white/20"
           >
             {/* Header de la Modal */}
             <div className="flex justify-between items-center p-8 pb-4">
@@ -48,7 +48,7 @@ const Modal = ({ isOpen, onClose, title, children }) => {
                 whileHover={{ scale: 1.1 }}
                 whileTap={{ scale: 0.9 }}
                 onClick={onClose}
-                className="p-2 rounded-full bg-[#e0e5ec] shadow-[4px_4px_8px_#babecc,-4px_-4px_8px_#ffffff] text-gray-500 hover:text-red-500 transition-colors"
+                className="p-2 rounded-full bg-[#e0e5ec] dark:bg-[#1a1d23] dark:shadow-lg shadow-[4px_4px_8px_#babecc,-4px_-4px_8px_#ffffff] text-gray-500 hover:text-red-500 transition-colors"
               >
                 <FiX className="w-5 h-5" />
               </motion.button>

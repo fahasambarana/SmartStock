@@ -92,7 +92,7 @@ const Sidebar = () => {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.8 }}
-          className=" bottom-8 left-4 right-4"
+          className="mt-3 bottom-8 left-4 right-4"
         >
           <div className="p-4 rounded-2xl bg-[#e0e5ec] dark:bg-[#1a1d23] shadow-[inset_4px_4px_8px_#b8bec5,inset_-4px_-4px_8px_#ffffff] dark:shadow-[inset_4px_4px_8px_#0e1013,inset_-4px_-4px_8px_rgba(255,255,255,0.05)] flex items-center gap-3">
              <motion.div 

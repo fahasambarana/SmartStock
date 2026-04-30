@@ -221,7 +221,7 @@ const Zones = () => {
         onClose={() => setIsModalOpen(false)}
         title={editingZone ? 'Modifier la Zone' : 'Nouvelle Zone'}
       >
-        <form onSubmit={handleSubmit} className="space-y-5 p-1">
+        <form onSubmit={handleSubmit} className="space-y-5 p-1 dark:bg-[#1a1d23]">
           <div>
             <label className="block text-[10px] font-black uppercase text-gray-500 dark:text-gray-400 mb-1 ml-1 tracking-widest">Nom de la Zone</label>
             <input

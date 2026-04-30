@@ -57,5 +57,22 @@ export const deleteUser = (id) => api.delete(`/users/${id}`);
 // Authentification
 export const register = (userData) => api.post('/auth/register', userData);
 export const login = (credentials) => api.post('/auth/login', credentials);
+// Alertes IA
+export const getAIProductAlerts = () => api.get('/ai-alerts/products');
+export const getAIZoneAlerts = () => api.get('/ai-alerts/zones');
+export const getAIAnomalies = () => api.get('/ai-alerts/anomalies');
+export const getAIDashboardAlerts = () => api.get('/ai-alerts/dashboard');
+// Dashboard API
+export const getDashboardKPIs = () => api.get('/dashboard/kpis');
+export const getMovementChartData = () => api.get('/dashboard/movement-chart');
+export const getZoneChartData = () => api.get('/dashboard/zone-chart');
+export const getRecentAlerts = () => api.get('/dashboard/recent-alerts');
+export const getFullDashboard = () => api.get('/dashboard/full');
+// Chat IA
+export const sendChatMessage = (data) => api.post('/chat/send', data);
+export const getChatHistory = () => api.get('/chat/history');
+export const getChatSuggestions = () => api.get('/chat/suggestions');
+
+
 
 export default api;

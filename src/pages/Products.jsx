@@ -165,7 +165,7 @@ const Products = () => {
                       {product.category}
                     </span>
                   </td>
-                  <td className="p-5 font-mono dark:text-gray-300">{product.price} €</td>
+                  <td className="p-5 font-mono dark:text-gray-300">{product.price} MGA</td>
                   <td className="p-5">
                     <span className={`font-bold ${product.quantity < 5 ? 'text-red-500 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>
                       {product.quantity}

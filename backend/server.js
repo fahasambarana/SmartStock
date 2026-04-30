@@ -7,6 +7,9 @@ const userRoutes = require('./routes/userRoutes');
 const zoneRoutes = require('./routes/zones');
 const productRoutes = require('./routes/products');
 const movementRoutes = require('./routes/movementRoutes');
+const aiAlertRoutes = require('./routes/aiAlerts');
+const dashboardRoutes = require('./routes/dashboardRoutes');
+const chatRoutes = require('./routes/chatRoutes');
 
 const Product = require('./models/Product');
 const Zone = require('./models/Zone');
@@ -30,6 +33,9 @@ app.use('/api/users', userRoutes);
 app.use('/api/zones', zoneRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/movements', movementRoutes);
+app.use('/api/ai-alerts', aiAlertRoutes);
+app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/chat', chatRoutes);
 
 const PORT = process.env.PORT || 5000;
 

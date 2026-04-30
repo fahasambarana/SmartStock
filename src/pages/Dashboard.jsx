@@ -1,7 +1,9 @@
-import React from 'react';
+// Dashboard.js - Version avec données réelles
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { FiPackage, FiAlertTriangle, FiCalendar, FiTrendingUp } from 'react-icons/fi';
+import { FiPackage, FiAlertTriangle, FiCalendar, FiTrendingUp, FiLoader } from 'react-icons/fi';
 import { Bar, Pie } from 'react-chartjs-2';
+import { getFullDashboard } from '../services/api';
 import {
   Chart as ChartJS, CategoryScale, LinearScale, BarElement,
   Title, Tooltip, Legend, ArcElement,
@@ -10,38 +12,33 @@ import {
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, ArcElement);
 
 const Dashboard = () => {
-  // Détecter si on est en mode sombre pour les graphiques
+  const [dashboardData, setDashboardData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
   const isDark = document.documentElement.classList.contains('dark');
-  const textColor = isDark ? '#e5e7eb' : '#374151'; // gray-200 : gray-700
+  const textColor = isDark ? '#e5e7eb' : '#374151';
 
-  // 1. Définition des données pour les graphiques
-  const stockMovementData = {
-    labels: ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Jun'],
-    datasets: [
-      {
-        label: 'Entrées',
-        data: [65, 59, 80, 81, 56, 55],
-        backgroundColor: '#3b82f6', 
-        borderRadius: 8,
-      },
-      {
-        label: 'Sorties',
-        data: [28, 48, 40, 19, 86, 27],
-        backgroundColor: '#f43f5e', 
-        borderRadius: 8,
-      },
-    ],
-  };
+  useEffect(() => {
+    fetchDashboardData();
+    const interval = setInterval(fetchDashboardData, 60000); // Rafraîchir toutes les minutes
+    return () => clearInterval(interval);
+  }, []);
 
-  const zoneOccupationData = {
-    labels: ['Zone A', 'Zone B', 'Zone C', 'Zone D'],
-    datasets: [
-      {
-        data: [85, 70, 60, 45],
-        backgroundColor: ['#f43f5e', '#3b82f6', '#fbbf24', '#10b981'],
-        borderWidth: 0,
-      },
-    ],
+  const fetchDashboardData = async () => {
+    try {
+      setLoading(true);
+      const response = await getFullDashboard();
+      if (response.data.success) {
+        setDashboardData(response.data.dashboard);
+      }
+      setError(null);
+    } catch (err) {
+      console.error("Erreur chargement dashboard:", err);
+      setError("Impossible de charger les données");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const commonOptions = {
@@ -51,18 +48,31 @@ const Dashboard = () => {
       legend: { 
         position: 'bottom', 
         labels: { 
-          color: textColor, // Couleur dynamique des légendes
+          color: textColor,
           font: { weight: 'bold' } 
         } 
       },
     },
     scales: {
-      x: { ticks: { color: textColor } }, // Couleur dynamique des axes X
-      y: { ticks: { color: textColor } }, // Couleur dynamique des axes Y
+      x: { ticks: { color: textColor } },
+      y: { ticks: { color: textColor } },
     }
   };
 
-  // 2. Variantes d'animation
+  const pieOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { 
+        position: 'bottom', 
+        labels: { 
+          color: textColor,
+          font: { weight: 'bold' } 
+        } 
+      },
+    }
+  };
+
   const containerVariants = {
     hidden: { opacity: 0 },
     show: { opacity: 1, transition: { staggerChildren: 0.1 } }
@@ -73,11 +83,32 @@ const Dashboard = () => {
     show: { y: 0, opacity: 1 }
   };
 
+  if (loading && !dashboardData) {
+    return (
+      <div className="max-w-7xl mx-auto pb-10 flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <FiLoader className="animate-spin text-4xl text-indigo-600 mx-auto mb-4" />
+          <p className="text-gray-600 dark:text-gray-400">Chargement du tableau de bord...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="max-w-7xl mx-auto pb-10">
+        <div className="bg-red-100 dark:bg-red-900/20 text-red-600 p-4 rounded-2xl text-center">
+          {error}
+        </div>
+      </div>
+    );
+  }
+
   const kpis = [
-    { title: 'Total Produits', value: '1,234', icon: FiPackage, color: 'text-blue-500' },
-    { title: 'Stock Faible', value: '23', icon: FiAlertTriangle, color: 'text-red-500' },
-    { title: 'Périssables', value: '12', icon: FiCalendar, color: 'text-amber-500' },
-    { title: 'Occupation %', value: '85%', icon: FiTrendingUp, color: 'text-emerald-500' },
+    { title: 'Total Produits', value: dashboardData?.kpis.totalProducts || '0', icon: FiPackage, color: 'text-blue-500' },
+    { title: 'Stock Faible', value: dashboardData?.kpis.lowStock || '0', icon: FiAlertTriangle, color: 'text-red-500' },
+    { title: 'Périssables', value: dashboardData?.kpis.perishable || '0', icon: FiCalendar, color: 'text-amber-500' },
+    { title: 'Occupation %', value: dashboardData?.kpis.occupation || '0%', icon: FiTrendingUp, color: 'text-emerald-500' },
   ];
 
   return (
@@ -125,7 +156,9 @@ const Dashboard = () => {
           transition={{ delay: 0.3 }}
           className="bg-[#e0e5ec] dark:bg-[#1a1d23] rounded-[2.5rem] p-8 shadow-[12px_12px_24px_#babecc,-12px_-12px_24px_#ffffff] dark:shadow-[10px_10px_20px_#0e1013,-10px_-10px_20px_rgba(255,255,255,0.05)] h-[400px] transition-all"
         >
-          <Bar data={stockMovementData} options={commonOptions} />
+          {dashboardData?.movementChart && (
+            <Bar data={dashboardData.movementChart} options={commonOptions} />
+          )}
         </motion.div>
 
         <motion.div 
@@ -134,7 +167,9 @@ const Dashboard = () => {
           transition={{ delay: 0.4 }}
           className="bg-[#e0e5ec] dark:bg-[#1a1d23] rounded-[2.5rem] p-8 shadow-[12px_12px_24px_#babecc,-12px_-12px_24px_#ffffff] dark:shadow-[10px_10px_20px_#0e1013,-10px_-10px_20px_rgba(255,255,255,0.05)] h-[400px] transition-all"
         >
-          <Pie data={zoneOccupationData} options={commonOptions} />
+          {dashboardData?.zoneChart && (
+            <Pie data={dashboardData.zoneChart} options={pieOptions} />
+          )}
         </motion.div>
       </div>
 
@@ -147,18 +182,26 @@ const Dashboard = () => {
       >
         <h3 className="text-xl font-black text-gray-700 dark:text-gray-200 mb-8 uppercase tracking-widest">Alertes de Stock</h3>
         <div className="space-y-6">
-          {[1, 2, 3].map((id) => (
-            <motion.div 
-              key={id}
-              whileHover={{ x: 10 }}
-              className="p-5 rounded-2xl bg-[#e0e5ec] dark:bg-[#1a1d23] shadow-[inset_6px_6px_12px_#babecc,inset_-6px_-6px_12px_#ffffff] dark:shadow-[inset_4px_4px_8px_#0e1013,inset_-4px_-4px_8px_rgba(255,255,255,0.05)] flex items-center border border-white/20 dark:border-white/5 transition-all"
-            >
-              <div className="w-10 h-10 rounded-full shadow-[4px_4px_8px_#babecc,-4px_-4px_8px_#ffffff] dark:shadow-[2px_2px_5px_#0e1013] flex items-center justify-center mr-4 bg-[#e0e5ec] dark:bg-[#1a1d23]">
-                <FiAlertTriangle className="text-amber-500" />
-              </div>
-              <p className="text-gray-600 dark:text-gray-300 font-bold italic">Incident #{id} : Analyse de stock requise sur la Zone {id}.</p>
-            </motion.div>
-          ))}
+          {dashboardData?.recentAlerts && dashboardData.recentAlerts.length > 0 ? (
+            dashboardData.recentAlerts.map((alert) => (
+              <motion.div 
+                key={alert.id}
+                whileHover={{ x: 10 }}
+                className="p-5 rounded-2xl bg-[#e0e5ec] dark:bg-[#1a1d23] shadow-[inset_6px_6px_12px_#babecc,inset_-6px_-6px_12px_#ffffff] dark:shadow-[inset_4px_4px_8px_#0e1013,inset_-4px_-4px_8px_rgba(255,255,255,0.05)] flex items-center border border-white/20 dark:border-white/5 transition-all"
+              >
+                <div className="w-10 h-10 rounded-full shadow-[4px_4px_8px_#babecc,-4px_-4px_8px_#ffffff] dark:shadow-[2px_2px_5px_#0e1013] flex items-center justify-center mr-4 bg-[#e0e5ec] dark:bg-[#1a1d23]">
+                  <FiAlertTriangle className={`${alert.priority === 1 ? 'text-red-500' : alert.priority === 2 ? 'text-amber-500' : 'text-blue-500'}`} />
+                </div>
+                <p className="text-gray-600 dark:text-gray-300 font-bold">
+                  {alert.productName} : {alert.message}
+                </p>
+              </motion.div>
+            ))
+          ) : (
+            <div className="p-5 text-center text-gray-400">
+              ✅ Aucune alerte active - Tout est sous contrôle
+            </div>
+          )}
         </div>
       </motion.div>
     </div>
