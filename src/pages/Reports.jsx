@@ -1,4 +1,3 @@
-// pages/Reports.jsx
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { 
@@ -12,7 +11,14 @@ import {
   FiPrinter,
   FiMail
 } from 'react-icons/fi';
-import api from '../services/api';
+import { 
+  getInventoryPreview, 
+  getMovementsPreview, 
+  getAlertsPreview,
+  getInventoryPDF,
+  getMovementsPDF,
+  getAlertsPDF
+} from '../services/api';
 
 const Reports = () => {
   const [selectedPeriod, setSelectedPeriod] = useState('month');
@@ -24,6 +30,7 @@ const Reports = () => {
   const [loading, setLoading] = useState(false);
   const [preview, setPreview] = useState(null);
   const [exporting, setExporting] = useState(false);
+  const [error, setError] = useState(null);
 
   // Styles neumorphismes
   const nmFlat = "bg-[#e0e5ec] dark:bg-[#1a1d23] shadow-[9px_9px_16px_rgb(163,177,198,0.6),-9px_-9px_16px_rgba(255,255,255,0.5)] dark:shadow-[6px_6px_12px_#0e1013,-6px_-6px_12px_rgba(255,255,255,0.05)]";
@@ -45,58 +52,97 @@ const Reports = () => {
 
   const handlePreview = async () => {
     setLoading(true);
+    setError(null);
     try {
       let response;
       if (reportType === 'inventory') {
-        response = await api.get(`/reports/inventory/preview?period=${selectedPeriod}`);
+        response = await getInventoryPreview(selectedPeriod);
       } else if (reportType === 'movements') {
-        response = await api.get(`/reports/movements/preview?startDate=${dateRange.startDate}&endDate=${dateRange.endDate}`);
+        response = await getMovementsPreview(dateRange.startDate, dateRange.endDate);
       } else {
-        response = await api.get(`/reports/alerts/preview`);
+        response = await getAlertsPreview();
       }
-      setPreview(response.data.data);
+      
+      if (response.data.success) {
+        setPreview(response.data.data);
+      } else {
+        setError('Erreur lors du chargement de l\'aperçu');
+      }
     } catch (error) {
       console.error('Erreur preview:', error);
-      alert('Erreur lors du chargement de l\'aperçu');
+      setError(error.response?.data?.error || 'Erreur de connexion au serveur');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleExportPDF = async (format = 'pdf') => {
+  const handleExportPDF = async () => {
     setExporting(true);
+    setError(null);
     try {
-      let url = '';
+      let response;
+      
       if (reportType === 'inventory') {
-        url = `/reports/inventory/${format}?period=${selectedPeriod}`;
+        response = await getInventoryPDF(selectedPeriod);
       } else if (reportType === 'movements') {
-        url = `/reports/movements/${format}?startDate=${dateRange.startDate}&endDate=${dateRange.endDate}`;
+        response = await getMovementsPDF(dateRange.startDate, dateRange.endDate);
       } else {
-        url = `/reports/alerts/${format}`;
+        response = await getAlertsPDF();
       }
       
-      const response = await api.get(url, { responseType: 'blob' });
+      // Vérifier que la réponse est valide
+      if (!response || !response.data || response.data.size === 0) {
+        throw new Error('Le fichier PDF est vide');
+      }
+      
+      // Créer le blob et télécharger
       const blob = new Blob([response.data], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
-      link.href = URL.createObjectURL(blob);
+      link.href = url;
       link.download = `rapport_${reportType}_${Date.now()}.pdf`;
+      document.body.appendChild(link);
       link.click();
-      URL.revokeObjectURL(link.href);
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      
     } catch (error) {
-      console.error('Erreur export:', error);
-      alert('Erreur lors de l\'export du PDF');
+      console.error('Erreur export PDF:', error);
+      setError(error.message || 'Erreur lors de l\'export du PDF');
     } finally {
       setExporting(false);
     }
   };
 
-  const getRiskColor = (severity) => {
-    switch(severity) {
-      case 'critical': return 'text-red-600 dark:text-red-400';
-      case 'high': return 'text-orange-600 dark:text-orange-400';
-      case 'medium': return 'text-yellow-600 dark:text-yellow-400';
-      default: return 'text-blue-600 dark:text-blue-400';
-    }
+  const handlePrint = () => {
+    if (!preview) return;
+    const printWindow = window.open('', '_blank');
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>Rapport ${reportType}</title>
+          <style>
+            body { font-family: Arial, sans-serif; padding: 20px; }
+            h1 { color: #2c3e50; }
+            table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+            th { background-color: #f2f2f2; }
+          </style>
+        </head>
+        <body>
+          <h1>Rapport ${reportTypes.find(r => r.id === reportType)?.name}</h1>
+          <p>Généré le: ${new Date().toLocaleString('fr-FR')}</p>
+          <pre>${JSON.stringify(preview, null, 2)}</pre>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+    printWindow.print();
+  };
+
+  const handleEmail = () => {
+    if (!preview) return;
+    window.location.href = `mailto:?subject=Rapport ${reportType}&body=Consultez le rapport joint généré le ${new Date().toLocaleString('fr-FR')}`;
   };
 
   const getRiskBadge = (severity) => {
@@ -109,7 +155,6 @@ const Reports = () => {
   };
 
   const currentReportType = reportTypes.find(r => r.id === reportType);
-  const currentPeriod = periods.find(p => p.id === selectedPeriod);
 
   return (
     <div className="min-h-screen bg-[#e0e5ec] dark:bg-[#1a1d23] p-8 text-gray-700 dark:text-gray-200 transition-colors duration-300">
@@ -128,6 +173,13 @@ const Reports = () => {
           Générer et exporter des rapports détaillés au format PDF
         </p>
       </motion.div>
+
+      {/* Affichage des erreurs */}
+      {error && (
+        <div className="mb-6 p-4 bg-red-100 dark:bg-red-900/20 text-red-600 rounded-xl">
+          ❌ {error}
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         
@@ -232,13 +284,13 @@ const Reports = () => {
               <button
                 onClick={handlePreview}
                 disabled={loading}
-                className={`flex-1 ${nmInset} py-3 rounded-xl font-bold text-indigo-600 dark:text-indigo-400 flex items-center justify-center gap-2`}
+                className={`flex-1 ${nmInset} py-3 rounded-xl font-bold text-indigo-600 dark:text-indigo-400 flex items-center justify-center gap-2 disabled:opacity-50`}
               >
                 {loading ? <FiLoader className="animate-spin" /> : <FiChevronRight />}
                 Aperçu
               </button>
               <button
-                onClick={() => handleExportPDF('pdf')}
+                onClick={handleExportPDF}
                 disabled={exporting || !preview}
                 className={`flex-1 ${nmFlat} py-3 rounded-xl font-bold flex items-center justify-center gap-2 text-green-600 dark:text-green-400 ${(!preview || exporting) ? 'opacity-50 cursor-not-allowed' : ''}`}
               >
@@ -250,12 +302,14 @@ const Reports = () => {
             {/* Actions supplémentaires */}
             <div className="flex gap-3 mt-3">
               <button
+                onClick={handlePrint}
                 disabled={!preview}
                 className={`flex-1 ${nmFlat} py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-2 text-gray-500 ${!preview ? 'opacity-50 cursor-not-allowed' : ''}`}
               >
                 <FiPrinter /> Imprimer
               </button>
               <button
+                onClick={handleEmail}
                 disabled={!preview}
                 className={`flex-1 ${nmFlat} py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-2 text-gray-500 ${!preview ? 'opacity-50 cursor-not-allowed' : ''}`}
               >
@@ -290,30 +344,38 @@ const Reports = () => {
             ) : preview ? (
               <div className="space-y-4 max-h-[600px] overflow-y-auto pr-2">
                 
+                {/* Informations de génération */}
+                <div className="text-xs text-gray-400 text-center pb-2 border-b border-gray-200 dark:border-gray-700">
+                  Généré le {new Date(preview.generatedAt || new Date()).toLocaleString('fr-FR')}
+                  {preview.period && ` - Période: ${preview.period}`}
+                </div>
+
                 {/* Résumé */}
-                <div className={`${nmInset} p-5 rounded-xl`}>
-                  <h3 className="font-bold mb-3 text-sm uppercase tracking-wider text-gray-500">Résumé</h3>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <div>
-                      <p className="text-xs text-gray-400">Total produits</p>
-                      <p className="text-2xl font-bold">{preview.summary?.totalProducts || 0}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-gray-400">Valeur totale</p>
-                      <p className="text-2xl font-bold">{preview.summary?.totalValue?.toLocaleString() || 0} €</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-gray-400">Anomalies</p>
-                      <p className={`text-2xl font-bold ${preview.summary?.anomaliesCount > 0 ? 'text-red-500' : 'text-green-500'}`}>
-                        {preview.summary?.anomaliesCount || 0}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-gray-400">Précision</p>
-                      <p className="text-2xl font-bold text-green-500">{preview.summary?.accuracyRate || 100}%</p>
+                {preview.summary && (
+                  <div className={`${nmInset} p-5 rounded-xl`}>
+                    <h3 className="font-bold mb-3 text-sm uppercase tracking-wider text-gray-500">Résumé</h3>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      <div>
+                        <p className="text-xs text-gray-400">Total produits</p>
+                        <p className="text-2xl font-bold">{preview.summary.totalProducts || 0}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-gray-400">Valeur totale</p>
+                        <p className="text-2xl font-bold">{preview.summary.totalValue?.toLocaleString() || 0} €</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-gray-400">Anomalies</p>
+                        <p className={`text-2xl font-bold ${preview.summary.anomaliesCount > 0 ? 'text-red-500' : 'text-green-500'}`}>
+                          {preview.summary.anomaliesCount || 0}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-gray-400">Précision</p>
+                        <p className="text-2xl font-bold text-green-500">{preview.summary.accuracyRate || 100}%</p>
+                      </div>
                     </div>
                   </div>
-                </div>
+                )}
 
                 {/* Anomalies */}
                 {preview.anomalies && preview.anomalies.length > 0 && (
@@ -322,7 +384,7 @@ const Reports = () => {
                       <FiAlertCircle /> Anomalies détectées ({preview.anomalies.length})
                     </h3>
                     <div className="space-y-3 max-h-60 overflow-y-auto">
-                      {preview.anomalies.map((anomaly, idx) => (
+                      {preview.anomalies.slice(0, 10).map((anomaly, idx) => (
                         <div key={idx} className="border-b border-gray-200 dark:border-gray-700 pb-3 last:border-0">
                           <div className="flex justify-between items-start">
                             <div>
@@ -339,6 +401,11 @@ const Reports = () => {
                         </div>
                       ))}
                     </div>
+                    {preview.anomalies.length > 10 && (
+                      <p className="text-xs text-center text-gray-400 mt-3">
+                        + {preview.anomalies.length - 10} autres anomalies
+                      </p>
+                    )}
                   </div>
                 )}
 
@@ -350,9 +417,12 @@ const Reports = () => {
                     </h3>
                     <div className="space-y-2">
                       {preview.recommendations.map((rec, idx) => (
-                        <div key={idx} className="flex items-start gap-2 text-sm p-2 rounded-lg bg-indigo-50 dark:bg-indigo-900/20">
-                          <span className="text-lg">{rec.priority === 'high' ? '🔴' : '🟡'}</span>
-                          <span>{rec.message}</span>
+                        <div key={idx} className="flex items-start gap-2 text-sm p-3 rounded-lg bg-indigo-50 dark:bg-indigo-900/20">
+                          <span className="text-lg">{rec.priority === 'critical' ? '🔴' : rec.priority === 'high' ? '🟠' : '🟡'}</span>
+                          <div>
+                            <p className="font-medium">{rec.message}</p>
+                            {rec.action && <p className="text-xs text-gray-500 mt-1">💡 {rec.action}</p>}
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -362,7 +432,7 @@ const Reports = () => {
                 {/* Statistiques des mouvements */}
                 {preview.stats && (
                   <div className={`${nmInset} p-5 rounded-xl`}>
-                    <h3 className="font-bold mb-3 text-sm uppercase tracking-wider text-gray-500">Statistiques</h3>
+                    <h3 className="font-bold mb-3 text-sm uppercase tracking-wider text-gray-500">Statistiques des mouvements</h3>
                     <div className="grid grid-cols-2 gap-4">
                       <div className="text-center p-3 rounded-lg bg-green-50 dark:bg-green-900/20">
                         <p className="text-2xl font-bold text-green-600">{preview.stats.totalIn || 0}</p>
@@ -373,12 +443,33 @@ const Reports = () => {
                         <p className="text-xs text-gray-500">Sorties</p>
                       </div>
                     </div>
+                    {preview.stats.byProduct && preview.stats.byProduct.length > 0 && (
+                      <div className="mt-4">
+                        <p className="text-xs font-bold mb-2">Top produits par quantité</p>
+                        <div className="space-y-1">
+                          {preview.stats.byProduct.slice(0, 5).map((p, idx) => (
+                            <div key={idx} className="flex justify-between text-xs">
+                              <span>{p.name}</span>
+                              <span className="font-bold">{p.quantity} unités</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
 
-                {/* Info génération */}
+                {/* Produits expirés */}
+                {preview.expiredCount > 0 && (
+                  <div className={`${nmInset} p-5 rounded-xl bg-red-50 dark:bg-red-900/20`}>
+                    <h3 className="font-bold mb-2 text-sm text-red-600">❌ Produits expirés</h3>
+                    <p className="text-lg font-bold">{preview.expiredCount} produit(s) à retirer</p>
+                  </div>
+                )}
+
+                {/* Info supplémentaire */}
                 <div className="text-center text-xs text-gray-400 pt-4">
-                  Généré le {new Date().toLocaleString('fr-FR')}
+                  SMART-STOCK Inventory System v1.0
                 </div>
               </div>
             ) : (

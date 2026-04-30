@@ -28,7 +28,6 @@ class InventoryAIService {
   async generateAutoInventory(period = 'month') {
     const startDate = this.getPeriodStartDate(period);
     
-    // Récupérer tous les produits
     const products = await Product.findAll({
       include: [{ model: Zone }]
     });
@@ -38,13 +37,9 @@ class InventoryAIService {
     let anomalies = [];
     
     for (const product of products) {
-      // Calculer le stock théorique basé sur TOUS les mouvements (pas seulement depuis startDate)
       const calculatedStock = await this.calculateTheoreticalStock(product.id);
-      
-      // Différence entre stock actuel et stock calculé
       const difference = product.quantity - calculatedStock;
       const isAnomaly = Math.abs(difference) > 0;
-      
       const productValue = product.price * product.quantity;
       totalValue += productValue;
       
@@ -73,7 +68,6 @@ class InventoryAIService {
       }
     }
     
-    // Trier les anomalies par sévérité
     anomalies.sort((a, b) => {
       const severityOrder = { critical: 0, high: 1, medium: 2, low: 3 };
       return severityOrder[a.severity] - severityOrder[b.severity];
@@ -101,11 +95,7 @@ class InventoryAIService {
     };
   }
   
-  /**
-   * Calcule le stock théorique basé sur l'historique COMPLET des mouvements
-   */
   async calculateTheoreticalStock(productId) {
-    // Récupérer TOUS les mouvements du produit
     const movements = await Movement.findAll({
       where: { productId: productId },
       order: [['movementDate', 'ASC']]
@@ -119,15 +109,11 @@ class InventoryAIService {
       } else if (movement.type === 'out') {
         calculatedStock -= movement.quantity;
       }
-      // Les transferts ne changent pas le stock total
     }
     
     return Math.max(0, calculatedStock);
   }
   
-  /**
-   * Détermine la sévérité d'une anomalie
-   */
   getAnomalySeverity(difference, currentStock) {
     if (difference > 10 || (currentStock > 0 && Math.abs(difference) > currentStock * 0.2)) {
       return 'critical';
@@ -141,9 +127,6 @@ class InventoryAIService {
     return 'low';
   }
   
-  /**
-   * Génère une recommandation pour une anomalie
-   */
   getAnomalyRecommendation(product, difference) {
     if (difference > 0) {
       return `Stock excedentaire de ${difference} unite(s). Verifier les entrees en doublon.`;
@@ -153,9 +136,6 @@ class InventoryAIService {
     return "Stock conforme";
   }
   
-  /**
-   * Génère des recommandations globales IA
-   */
   generateRecommendations(anomalies, inventory) {
     const recommendations = [];
     
@@ -216,18 +196,10 @@ class InventoryAIService {
     return lastMovement ? lastMovement.movementDate : null;
   }
   
-  // ==================== METHODES POUR LE CONTROLLER ====================
-  
-  /**
-   * Aperçu de l'inventaire (sans PDF)
-   */
   async getInventoryPreview(period) {
     return await this.generateAutoInventory(period);
   }
   
-  /**
-   * Aperçu des mouvements (sans PDF)
-   */
   async getMovementsPreview(startDate, endDate) {
     const movements = await Movement.findAll({
       where: {
@@ -255,9 +227,6 @@ class InventoryAIService {
     };
   }
   
-  /**
-   * Aperçu des alertes
-   */
   async getAlertsPreview() {
     const products = await Product.findAll({
       where: {
@@ -283,44 +252,27 @@ class InventoryAIService {
     };
   }
   
-  // ==================== METHODES D'EXPORT PDF ====================
-  
-  /**
-   * Génère un rapport d'inventaire
-   */
   async generateInventoryReport(period = 'month', format = 'pdf') {
     const inventory = await this.generateAutoInventory(period);
-    
     if (format === 'pdf') {
       return await this.exportToPDF(inventory);
     }
-    
     return inventory;
   }
   
-  /**
-   * Génère un rapport des mouvements
-   */
   async generateMovementsReport(startDate, endDate, format = 'pdf') {
     const report = await this.getMovementsPreview(startDate, endDate);
-    
     if (format === 'pdf') {
       return await this.exportMovementsToPDF(report);
     }
-    
     return report;
   }
   
-  /**
-   * Génère un rapport des alertes
-   */
   async generateAlertsReport(format = 'pdf') {
     const alerts = await this.getAlertsPreview();
-    
     if (format === 'pdf') {
       return await this.exportAlertsToPDF(alerts);
     }
-    
     return alerts;
   }
   
@@ -345,14 +297,14 @@ class InventoryAIService {
       .slice(0, 10);
   }
   
-  // ==================== EXPORT PDF ====================
+  // ==================== EXPORT PDF CORRIGÉ ====================
   
   /**
-   * Exporte l'inventaire en PDF
+   * Exporte l'inventaire en PDF (CORRIGÉ)
    */
   async exportToPDF(inventory) {
     return new Promise((resolve, reject) => {
-      const doc = new PDFDocument({ margin: 50, size: 'A4' });
+      const doc = new PDFDocument({ margin: 50, size: 'A4', bufferPages: true });
       const chunks = [];
       
       doc.on('data', chunk => chunks.push(chunk));
@@ -364,7 +316,7 @@ class InventoryAIService {
       doc.moveDown();
       doc.fontSize(10).font('Helvetica');
       doc.text(`Genere le: ${new Date(inventory.generatedAt).toLocaleString('fr-FR')}`, { align: 'center' });
-      doc.text(`Periode: ${inventory.period} (depuis le ${new Date(inventory.periodStart).toLocaleDateString('fr-FR')})`, { align: 'center' });
+      doc.text(`Periode: ${inventory.period}`, { align: 'center' });
       doc.moveDown();
       
       this.drawLine(doc);
@@ -385,38 +337,44 @@ class InventoryAIService {
       doc.moveDown();
       
       // Anomalies
-      if (inventory.anomalies.length > 0) {
+      if (inventory.anomalies && inventory.anomalies.length > 0) {
+        if (doc.y > 650) doc.addPage();
+        
         doc.fontSize(14).font('Helvetica-Bold').text('ANOMALIES DETECTEES', { underline: true });
         doc.moveDown(0.5);
         
-        inventory.anomalies.forEach((a) => {
-          doc.fontSize(10).font('Helvetica-Bold');
+        for (const a of inventory.anomalies.slice(0, 20)) {
+          if (doc.y > 700) doc.addPage();
+          
           let severityText = '';
           if (a.severity === 'critical') severityText = 'CRITIQUE';
           else if (a.severity === 'high') severityText = 'HAUTE';
           else if (a.severity === 'medium') severityText = 'MOYENNE';
           else severityText = 'BASSE';
           
+          doc.fontSize(10).font('Helvetica-Bold');
           doc.text(`[${severityText}] ${this.cleanText(a.productName)}: ${a.difference > 0 ? '+' : ''}${a.difference} unites`);
           doc.fontSize(9).font('Helvetica');
           doc.text(`   Action: ${this.cleanText(a.recommendation)}`, { indent: 10 });
           doc.moveDown(0.3);
-        });
+        }
         doc.moveDown();
       }
       
       // Recommandations
-      if (inventory.recommendations.length > 0) {
+      if (inventory.recommendations && inventory.recommendations.length > 0) {
         doc.addPage();
         doc.fontSize(14).font('Helvetica-Bold').text('RECOMMANDATIONS IA', { underline: true });
         doc.moveDown(0.5);
         
-        inventory.recommendations.forEach(rec => {
+        for (const rec of inventory.recommendations) {
+          if (doc.y > 750) doc.addPage();
+          
           doc.fontSize(10).font('Helvetica');
           const priorityText = rec.priority === 'high' ? 'HAUTE PRIORITE' : 'PRIORITE MOYENNE';
           doc.text(`[${priorityText}] ${this.cleanText(rec.message)}`);
           doc.moveDown(0.3);
-        });
+        }
       }
       
       // Détail des produits
@@ -436,7 +394,8 @@ class InventoryAIService {
       let y = startY + 20;
       doc.fontSize(8).font('Helvetica');
       
-      for (const product of inventory.inventory.slice(0, 30)) {
+      const productsToShow = (inventory.inventory || []).slice(0, 50);
+      for (const product of productsToShow) {
         if (y > 750) {
           doc.addPage();
           y = 50;
@@ -454,25 +413,27 @@ class InventoryAIService {
           status = product.difference > 0 ? 'Excedent' : 'Manquant';
         }
         
-        doc.text(this.cleanText(product.productName.substring(0, 25)), colPositions.name, y);
-        doc.text(product.currentStock.toString(), colPositions.stock, y);
-        doc.text(this.cleanText(product.zone), colPositions.zone, y);
+        doc.text(this.cleanText((product.productName || '').substring(0, 25)), colPositions.name, y);
+        doc.text((product.currentStock || 0).toString(), colPositions.stock, y);
+        doc.text(this.cleanText(product.zone || 'N/A'), colPositions.zone, y);
         doc.text(status, colPositions.status, y);
         
         y += 18;
       }
       
-      // Pied de page
+      // Pied de page CORRIGÉ
       const pageCount = doc.bufferedPageRange().count;
-      for (let i = 0; i < pageCount; i++) {
-        doc.switchToPage(i);
-        doc.fontSize(8).font('Helvetica');
-        doc.text(
-          `Page ${i + 1} / ${pageCount} - SMART-STOCK Inventory System`,
-          50,
-          doc.page.height - 50,
-          { align: 'center' }
-        );
+      if (pageCount > 0) {
+        for (let i = 0; i < pageCount; i++) {
+          doc.switchToPage(i);
+          doc.fontSize(8).font('Helvetica');
+          doc.text(
+            `Page ${i + 1} / ${pageCount} - SMART-STOCK Inventory System`,
+            50,
+            doc.page.height - 50,
+            { align: 'center' }
+          );
+        }
       }
       
       doc.end();
@@ -480,53 +441,54 @@ class InventoryAIService {
   }
   
   /**
-   * Exporte les mouvements en PDF
+   * Exporte les mouvements en PDF (CORRIGÉ)
    */
   async exportMovementsToPDF(report) {
     return new Promise((resolve, reject) => {
-      const doc = new PDFDocument({ margin: 50, size: 'A4' });
+      const doc = new PDFDocument({ margin: 50, size: 'A4', bufferPages: true });
       const chunks = [];
       
       doc.on('data', chunk => chunks.push(chunk));
       doc.on('end', () => resolve(Buffer.concat(chunks)));
       doc.on('error', reject);
       
-      // En-tête
       doc.fontSize(20).font('Helvetica-Bold').text('RAPPORT DES MOUVEMENTS', { align: 'center' });
       doc.moveDown();
       doc.fontSize(10).font('Helvetica');
       doc.text(`Genere le: ${new Date(report.generatedAt).toLocaleString('fr-FR')}`, { align: 'center' });
-      doc.text(`Periode: ${new Date(report.startDate).toLocaleDateString('fr-FR')} - ${new Date(report.endDate).toLocaleDateString('fr-FR')}`, { align: 'center' });
+      if (report.startDate && report.endDate) {
+        doc.text(`Periode: ${new Date(report.startDate).toLocaleDateString('fr-FR')} - ${new Date(report.endDate).toLocaleDateString('fr-FR')}`, { align: 'center' });
+      }
       doc.moveDown();
       
       this.drawLine(doc);
       doc.moveDown();
       
-      // Statistiques
       doc.fontSize(14).font('Helvetica-Bold').text('STATISTIQUES', { underline: true });
       doc.moveDown(0.5);
       doc.fontSize(10).font('Helvetica');
-      doc.text(`Total entrees: ${report.stats.totalIn} unites`);
-      doc.text(`Total sorties: ${report.stats.totalOut} unites`);
-      doc.text(`Total transferts: ${report.stats.totalTransfer}`);
-      doc.text(`Variation nette: ${report.stats.totalIn - report.stats.totalOut} unites`);
+      doc.text(`Total entrees: ${report.stats?.totalIn || 0} unites`);
+      doc.text(`Total sorties: ${report.stats?.totalOut || 0} unites`);
+      doc.text(`Total transferts: ${report.stats?.totalTransfer || 0}`);
       doc.moveDown();
       
       this.drawLine(doc);
       doc.moveDown();
       
-      // Top produits
-      if (report.stats.byProduct.length > 0) {
+      if (report.stats?.byProduct && report.stats.byProduct.length > 0) {
+        if (doc.y > 650) doc.addPage();
+        
         doc.fontSize(12).font('Helvetica-Bold').text('TOP PRODUITS', { underline: true });
         doc.moveDown(0.5);
         doc.fontSize(9).font('Helvetica');
-        report.stats.byProduct.forEach(p => {
+        
+        for (const p of report.stats.byProduct.slice(0, 15)) {
+          if (doc.y > 750) doc.addPage();
           doc.text(`• ${this.cleanText(p.name)}: ${p.quantity} unites`);
-        });
+        }
         doc.moveDown();
       }
       
-      // Liste des mouvements
       if (report.movements && report.movements.length > 0) {
         doc.addPage();
         doc.fontSize(14).font('Helvetica-Bold').text('LISTE DES MOUVEMENTS', { underline: true });
@@ -549,16 +511,38 @@ class InventoryAIService {
           if (y > 750) {
             doc.addPage();
             y = 50;
+            doc.fontSize(8).font('Helvetica-Bold');
+            doc.text('Date', colPositions.date, y);
+            doc.text('Produit', colPositions.product, y);
+            doc.text('Type', colPositions.type, y);
+            doc.text('Qte', colPositions.qty, y);
+            doc.text('Par', colPositions.user, y);
+            y += 15;
+            doc.fontSize(8).font('Helvetica');
           }
           
           const typeText = m.type === 'in' ? 'Entree' : m.type === 'out' ? 'Sortie' : 'Transfert';
           doc.text(new Date(m.movementDate).toLocaleString('fr-FR'), colPositions.date, y);
-          doc.text(this.cleanText(m.productName.substring(0, 25)), colPositions.product, y);
+          doc.text(this.cleanText((m.productName || '').substring(0, 25)), colPositions.product, y);
           doc.text(typeText, colPositions.type, y);
-          doc.text(m.quantity.toString(), colPositions.qty, y);
+          doc.text((m.quantity || 0).toString(), colPositions.qty, y);
           doc.text(this.cleanText(m.userName || 'N/A'), colPositions.user, y);
           
           y += 16;
+        }
+      }
+      
+      const pageCount = doc.bufferedPageRange().count;
+      if (pageCount > 0) {
+        for (let i = 0; i < pageCount; i++) {
+          doc.switchToPage(i);
+          doc.fontSize(8).font('Helvetica');
+          doc.text(
+            `Page ${i + 1} / ${pageCount} - SMART-STOCK Movements Report`,
+            50,
+            doc.page.height - 50,
+            { align: 'center' }
+          );
         }
       }
       
@@ -567,18 +551,17 @@ class InventoryAIService {
   }
   
   /**
-   * Exporte les alertes en PDF
+   * Exporte les alertes en PDF (CORRIGÉ)
    */
   async exportAlertsToPDF(alerts) {
     return new Promise((resolve, reject) => {
-      const doc = new PDFDocument({ margin: 50, size: 'A4' });
+      const doc = new PDFDocument({ margin: 50, size: 'A4', bufferPages: true });
       const chunks = [];
       
       doc.on('data', chunk => chunks.push(chunk));
       doc.on('end', () => resolve(Buffer.concat(chunks)));
       doc.on('error', reject);
       
-      // En-tête
       doc.fontSize(20).font('Helvetica-Bold').text('RAPPORT DES ALERTES', { align: 'center' });
       doc.moveDown();
       doc.fontSize(10).font('Helvetica');
@@ -588,31 +571,47 @@ class InventoryAIService {
       this.drawLine(doc);
       doc.moveDown();
       
-      // Résumé
       doc.fontSize(14).font('Helvetica-Bold').text('RESUME', { underline: true });
       doc.moveDown(0.5);
       doc.fontSize(10).font('Helvetica');
-      doc.text(`Total alertes: ${alerts.totalAlerts}`);
-      doc.text(`Alertes critiques: ${alerts.criticalAlerts}`);
+      doc.text(`Total alertes: ${alerts.totalAlerts || 0}`);
+      doc.text(`Alertes critiques: ${alerts.criticalAlerts || 0}`);
       doc.moveDown();
       
       this.drawLine(doc);
       doc.moveDown();
       
-      // Liste des alertes
-      if (alerts.alerts.length > 0) {
+      if (alerts.alerts && alerts.alerts.length > 0) {
+        if (doc.y > 650) doc.addPage();
+        
         doc.fontSize(14).font('Helvetica-Bold').text('LISTE DES ALERTES', { underline: true });
         doc.moveDown(0.5);
         
-        alerts.alerts.forEach(alert => {
+        for (const alert of alerts.alerts) {
+          if (doc.y > 750) doc.addPage();
+          
           const levelText = alert.alertLevel === 'critical' ? 'CRITIQUE' : 'HAUTE';
           doc.fontSize(10).font('Helvetica-Bold');
           doc.text(`[${levelText}] ${this.cleanText(alert.productName)}`);
           doc.fontSize(9).font('Helvetica');
-          doc.text(`   Stock restant: ${alert.currentStock} unites`);
-          doc.text(`   Action: ${this.cleanText(alert.recommendation)}`);
+          doc.text(`   Stock restant: ${alert.currentStock || 0} unites`);
+          doc.text(`   Action: ${this.cleanText(alert.recommendation || 'Verifier le stock')}`);
           doc.moveDown(0.5);
-        });
+        }
+      }
+      
+      const pageCount = doc.bufferedPageRange().count;
+      if (pageCount > 0) {
+        for (let i = 0; i < pageCount; i++) {
+          doc.switchToPage(i);
+          doc.fontSize(8).font('Helvetica');
+          doc.text(
+            `Page ${i + 1} / ${pageCount} - SMART-STOCK Alerts Report`,
+            50,
+            doc.page.height - 50,
+            { align: 'center' }
+          );
+        }
       }
       
       doc.end();
