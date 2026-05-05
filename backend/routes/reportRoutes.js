@@ -15,7 +15,9 @@ router.get('/inventory/pdf', reportController.generateInventoryPDF);
 router.get('/movements/pdf', reportController.generateMovementsPDF);
 router.get('/alerts/pdf', reportController.generateAlertsPDF);
 
-// Route d'aperçu (sans PDF)
+// Routes d'aperçu (sans PDF)
 router.get('/inventory/preview', reportController.getInventoryPreview);
+router.get('/movements/preview', reportController.getMovementsPreview);
+router.get('/alerts/preview', reportController.getAlertsPreview);
 
 module.exports = router;
