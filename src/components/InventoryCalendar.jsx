@@ -98,7 +98,7 @@ const InventoryCalendar = () => {
               {/* Score de santé */}
               <div className={`${nmInset} p-5 rounded-xl text-center`}>
                 <div className={`text-5xl font-bold ${getHealthColor(inventory.summary.healthScore)}`}>
-                  {inventory.summary.healthScore}
+                  {inventory.summary.healthScore}%
                 </div>
               </div>
 
