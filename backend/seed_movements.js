@@ -1,8 +1,5 @@
 const sequelize = require('./config/database');
-const Product = require('./models/Product');
-const Zone = require('./models/Zone');
-const User = require('./models/User');
-const Movement = require('./models/Movement');
+const { Product, Zone, User, Movement } = require('./models/associations');
 
 async function seedMovements() {
   try {
@@ -38,95 +35,95 @@ async function seedMovements() {
       // Entrées de stock
       {
         type: 'Entrée',
-        ProductId: products[0].id,
+        productId: products[0].id,
         quantityBefore: 0,
         quantityAfter: 100,
         quantityMoved: 100,
         sourceZoneId: null,
         destinationZoneId: zones[0].id,
         reason: 'Approvisionnement initial',
-        UserId: user?.id || null,
+        userId: user?.id || null,
         notes: 'Stock initial reçu du fournisseur',
         createdAt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) // 30 days ago
       },
       {
         type: 'Entrée',
-        ProductId: products[1].id,
+        productId: products[1].id,
         quantityBefore: 0,
         quantityAfter: 50,
         quantityMoved: 50,
         sourceZoneId: null,
         destinationZoneId: zones[1].id,
         reason: 'Reapprovisionnnement',
-        UserId: user?.id || null,
+        userId: user?.id || null,
         notes: 'Nouvel achat',
         createdAt: new Date(Date.now() - 25 * 24 * 60 * 60 * 1000) // 25 days ago
       },
       // Sortie de stock
       {
         type: 'Sortie',
-        ProductId: products[0].id,
+        productId: products[0].id,
         quantityBefore: 100,
         quantityAfter: 80,
         quantityMoved: 20,
         sourceZoneId: zones[0].id,
         destinationZoneId: null,
         reason: 'Vente',
-        UserId: user?.id || null,
+        userId: user?.id || null,
         notes: 'Vente client #001',
         createdAt: new Date(Date.now() - 20 * 24 * 60 * 60 * 1000)
       },
       {
         type: 'Sortie',
-        ProductId: products[1].id,
+        productId: products[1].id,
         quantityBefore: 50,
         quantityAfter: 45,
         quantityMoved: 5,
         sourceZoneId: zones[1].id,
         destinationZoneId: null,
         reason: 'Échantillon',
-        UserId: user?.id || null,
+        userId: user?.id || null,
         notes: 'Échantillon gratuit pour client potentiel',
         createdAt: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000)
       },
       // Transfert
       {
         type: 'Transfert',
-        ProductId: products[0].id,
+        productId: products[0].id,
         quantityBefore: 80,
         quantityAfter: 80,
         quantityMoved: 30,
         sourceZoneId: zones[0].id,
         destinationZoneId: zones[1].id,
         reason: 'Réorganisation stock',
-        UserId: user?.id || null,
+        userId: user?.id || null,
         notes: 'Transfert pour équilibrer les charges',
         createdAt: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000)
       },
       {
         type: 'Transfert',
-        ProductId: products[2]?.id || products[0].id,
+        productId: products[2]?.id || products[0].id,
         quantityBefore: products[2]?.quantity || 80,
         quantityAfter: products[2]?.quantity || 80,
         quantityMoved: 15,
         sourceZoneId: zones[1].id,
         destinationZoneId: zones[0].id,
         reason: 'Retour stock',
-        UserId: user?.id || null,
+        userId: user?.id || null,
         notes: 'Retour après inventaire',
         createdAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000)
       },
       // Entrée récente
       {
         type: 'Entrée',
-        ProductId: products[2]?.id || products[1].id,
+        productId: products[2]?.id || products[1].id,
         quantityBefore: products[2]?.quantity || 45,
         quantityAfter: (products[2]?.quantity || 45) + 30,
         quantityMoved: 30,
         sourceZoneId: null,
         destinationZoneId: zones[2]?.id || zones[0].id,
         reason: 'Reapprovisionnnement',
-        UserId: user?.id || null,
+        userId: user?.id || null,
         notes: 'Arrivée fournisseur',
         createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000)
       }

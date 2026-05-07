@@ -161,14 +161,14 @@ exports.createMovement = async (req, res) => {
     // Create movement record
     const movement = await Movement.create({
       type,
-      ProductId,
+      productId: ProductId,
       quantityBefore,
       quantityAfter,
       quantityMoved: parseInt(quantityMoved),
       sourceZoneId: sourceZoneId || null,
       destinationZoneId: destinationZoneId || null,
       reason,
-      UserId,
+      userId: UserId,
       notes,
     });
 
@@ -236,7 +236,7 @@ exports.getAllMovements = async (req, res) => {
 exports.getProductMovements = async (req, res) => {
   try {
     const movements = await Movement.findAll({
-      where: { ProductId: req.params.productId },
+      where: { productId: req.params.productId },
       include: [
         {
           model: Product,

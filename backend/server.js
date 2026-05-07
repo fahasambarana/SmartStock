@@ -2,29 +2,7 @@ const express = require("express");
 const cors = require("cors");
 const dotenv = require("dotenv");
 const { initializeDatabase } = require("./bootstrap");
-
-const Product = require("./models/Product");
-const Zone = require("./models/Zone");
-const User = require("./models/User");
-const Movement = require("./models/Movement");
-
-// DB Relations
-Zone.hasMany(Product, { foreignKey: "ZoneId" });
-Product.belongsTo(Zone, { foreignKey: "ZoneId" });
-
-Movement.belongsTo(Product, { foreignKey: "ProductId" });
-Product.hasMany(Movement, { foreignKey: "ProductId" });
-
-Movement.belongsTo(Zone, { foreignKey: "sourceZoneId", as: "sourceZone" });
-Movement.belongsTo(Zone, {
-  foreignKey: "destinationZoneId",
-  as: "destinationZone",
-});
-Zone.hasMany(Movement, { foreignKey: "sourceZoneId", as: "movementsOut" });
-Zone.hasMany(Movement, { foreignKey: "destinationZoneId", as: "movementsIn" });
-
-Movement.belongsTo(User, { foreignKey: "UserId" });
-User.hasMany(Movement, { foreignKey: "UserId" });
+const { Product, Zone, User, Movement } = require("./models/associations");
 
 dotenv.config();
 

@@ -9,81 +9,89 @@ const Movement = sequelize.define(
       primaryKey: true,
       autoIncrement: true,
     },
+
     productId: {
       type: DataTypes.INTEGER,
       allowNull: false,
-      references: {
-        model: "Products", // Nom exact de la table dans MySQL
-        key: "id",
-      },
+      field: "productId",
     },
-    productName: {
-      type: DataTypes.STRING,
-      allowNull: false,
-    },
-    quantity: {
-      type: DataTypes.INTEGER,
-      allowNull: false,
-      validate: {
-        min: 1,
-      },
-    },
-    type: {
-      type: DataTypes.ENUM("in", "out", "transfer"),
-      allowNull: false,
-    },
+
     sourceZoneId: {
       type: DataTypes.INTEGER,
       allowNull: true,
-      references: {
-        model: "Zones", // Nom exact de la table dans MySQL
-        key: "id",
-      },
+      field: "sourceZoneId",
+    },
+
+    destinationZoneId: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      field: "destinationZoneId",
+    },
+
+    userId: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      field: "userId",
+    },
+
+    // Champs dénormalisés pour historique
+    productName: {
+      type: DataTypes.STRING,
+      allowNull: false,
     },
     sourceZoneName: {
       type: DataTypes.STRING,
       allowNull: true,
     },
-    destinationZoneId: {
-      type: DataTypes.INTEGER,
-      allowNull: true,
-      references: {
-        model: "Zones", // Nom exact de la table dans MySQL
-        key: "id",
-      },
-    },
     destinationZoneName: {
       type: DataTypes.STRING,
       allowNull: true,
-    },
-    reason: {
-      type: DataTypes.STRING,
-      allowNull: true,
-    },
-    reference: {
-      type: DataTypes.STRING,
-      allowNull: true,
-    },
-    userId: {
-      type: DataTypes.INTEGER,
-      allowNull: false,
-      references: {
-        model: "users", // ← IMPORTANT: utilisez 'users' en minuscule
-        key: "id",
-      },
     },
     userName: {
       type: DataTypes.STRING,
       allowNull: false,
     },
+
+    type: {
+      type: DataTypes.ENUM("Entrée", "Sortie", "Transfert"),
+      allowNull: false,
+    },
+
+    quantityMoved: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+    },
+
+    quantityBefore: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+    },
+
+    quantityAfter: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+    },
+
+    reason: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
+
+    reference: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
+
     status: {
       type: DataTypes.ENUM("pending", "completed", "cancelled"),
       defaultValue: "completed",
     },
+
     notes: {
       type: DataTypes.TEXT,
       allowNull: true,
     },
+
     movementDate: {
       type: DataTypes.DATE,
       allowNull: false,
@@ -92,7 +100,17 @@ const Movement = sequelize.define(
   },
   {
     tableName: "movements",
+    freezeTableName: true,
     timestamps: true,
+    underscored: false,
+    indexes: [
+      { fields: ["productId"] },
+      { fields: ["userId"] },
+      { fields: ["sourceZoneId"] },
+      { fields: ["destinationZoneId"] },
+      { fields: ["type"] },
+      { fields: ["movementDate"] },
+    ],
   },
 );
 

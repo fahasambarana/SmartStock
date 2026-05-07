@@ -1,12 +1,7 @@
 const dotenv = require('dotenv');
 dotenv.config();
 const sequelize = require('./config/database');
-const Product = require('./models/Product');
-const Zone = require('./models/Zone');
-
-// DB Relations
-Zone.hasMany(Product, { foreignKey: 'ZoneId' });
-Product.belongsTo(Zone, { foreignKey: 'ZoneId' });
+const { Product, Zone } = require('./models/associations');
 
 async function syncDB() {
   try {
