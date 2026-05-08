@@ -18,6 +18,20 @@ const BASE_USERS = [
     role: "manager",
     status: "approved",
   },
+  {
+    username: "manager_aliments",
+    email: "manager.aliments@example.com",
+    password: "Manager123!",
+    role: "manager",
+    status: "approved",
+  },
+  {
+    username: "manager_electronique",
+    email: "manager.electronique@example.com",
+    password: "Manager123!",
+    role: "manager",
+    status: "approved",
+  },
 ];
 
 const BASE_ZONE_TYPES = [
@@ -38,6 +52,8 @@ const BASE_ZONES = [
 const MANAGER_ZONES = [
   { name: 'Zone Manager A', description: 'Zone de stockage du manager', location: 'Entrepôt Manager', capacite_max: 700, capacite_actuelle: 0, type: 'standard', unite_capacite: 'Unités' },
   { name: 'Zone Manager Froide', description: 'Zone froide du manager', location: 'Entrepôt Manager', capacite_max: 250, capacite_actuelle: 0, type: 'froide', unite_capacite: 'Volume' },
+  { name: 'Zone Manager Aliments', description: 'Zone dédiée au manager aliments', location: 'Entrepôt Manager Aliments', capacite_max: 900, capacite_actuelle: 0, type: 'standard', unite_capacite: 'Unités' },
+  { name: 'Zone Manager Electronique', description: 'Zone dédiée au manager électronique', location: 'Entrepôt Manager Electronique', capacite_max: 450, capacite_actuelle: 0, type: 'standard', unite_capacite: 'Unités' },
 ];
 
 const BASE_CATEGORIES = [
@@ -53,9 +69,12 @@ const BASE_PRODUCTS = [
 ];
 
 const MANAGER_PRODUCTS = [
-  { name: 'Riz local', category: 'Aliments', price: 1.8, quantity: 80, zoneName: 'Zone Manager A', expirationDate: '2026-12-31', volume_unitaire: 0.2, unit: 'kg' },
-  { name: 'Yaourt nature', category: 'Aliments', price: 0.9, quantity: 45, zoneName: 'Zone Manager Froide', expirationDate: '2026-06-30', volume_unitaire: 0.05, unit: 'pièce' },
-  { name: 'Casque audio', category: 'Électronique', price: 35, quantity: 12, zoneName: 'Zone Manager A', expirationDate: null, volume_unitaire: 0.15, unit: 'pièce' },
+  { managerUsername: 'manager', name: 'Riz local', category: 'Aliments', price: 1.8, quantity: 80, zoneName: 'Zone Manager A', expirationDate: '2026-12-31', volume_unitaire: 0.2, unit: 'kg' },
+  { managerUsername: 'manager', name: 'Yaourt nature', category: 'Aliments', price: 0.9, quantity: 45, zoneName: 'Zone Manager Froide', expirationDate: '2026-06-30', volume_unitaire: 0.05, unit: 'pièce' },
+  { managerUsername: 'manager_aliments', name: 'Farine de manioc', category: 'Aliments', price: 1.2, quantity: 120, zoneName: 'Zone Manager Aliments', expirationDate: '2026-11-30', volume_unitaire: 0.12, unit: 'kg' },
+  { managerUsername: 'manager_aliments', name: 'Huile de cuisson', category: 'Aliments', price: 4.5, quantity: 60, zoneName: 'Zone Manager Aliments', expirationDate: '2027-01-15', volume_unitaire: 0.08, unit: 'litre' },
+  { managerUsername: 'manager_electronique', name: 'Casque audio', category: 'Électronique', price: 35, quantity: 12, zoneName: 'Zone Manager Electronique', expirationDate: null, volume_unitaire: 0.15, unit: 'pièce' },
+  { managerUsername: 'manager_electronique', name: 'Clavier USB', category: 'Électronique', price: 18, quantity: 30, zoneName: 'Zone Manager Electronique', expirationDate: null, volume_unitaire: 0.1, unit: 'pièce' },
 ];
 
 const BASE_MOVEMENTS = [
@@ -155,10 +174,11 @@ async function seedProducts() {
   // Récupérer les zones et catégories
   const zones = await Zone.findAll();
   const categories = await Category.findAll();
-  const manager = await User.findOne({ where: { role: 'manager', status: 'approved' }, order: [['id', 'ASC']] });
+  const managers = await User.findAll({ where: { role: 'manager', status: 'approved' } });
   
   const zoneMap = new Map(zones.map((z) => [z.name, z]));
   const categoryMap = new Map(categories.map((c) => [c.name, c]));
+  const managerMap = new Map(managers.map((m) => [m.username, m]));
 
   const buildProductPayload = (p, userId = null) => {
     const category = categoryMap.get(p.category);
@@ -194,20 +214,22 @@ async function seedProducts() {
     if (wasCreated) created += 1;
   }
 
-  if (!manager) {
-    console.log("⚠️ Produits manager ignorés : manager approuvé introuvable");
-  } else {
-    for (const productSeed of MANAGER_PRODUCTS) {
-      const payload = buildProductPayload(productSeed, manager.id);
-      const [, wasCreated] = await Product.findOrCreate({
-        where: {
-          name: productSeed.name,
-          UserId: manager.id,
-        },
-        defaults: payload,
-      });
-      if (wasCreated) created += 1;
+  for (const productSeed of MANAGER_PRODUCTS) {
+    const manager = managerMap.get(productSeed.managerUsername);
+    if (!manager) {
+      console.warn(`⚠️ Manager "${productSeed.managerUsername}" introuvable pour le produit ${productSeed.name}`);
+      continue;
     }
+
+    const payload = buildProductPayload(productSeed, manager.id);
+    const [, wasCreated] = await Product.findOrCreate({
+      where: {
+        name: productSeed.name,
+        UserId: manager.id,
+      },
+      defaults: payload,
+    });
+    if (wasCreated) created += 1;
   }
 
   const existing = await Product.count();
