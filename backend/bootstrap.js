@@ -44,7 +44,7 @@ const BASE_ZONE_TYPES = [
 ];
 
 const BASE_ZONES = [
-  { name: 'Zone A', description: 'Zone principale', location: 'Entrepôt 1', capacite_max: 1000, capacite_actuelle: 0, type: 'standard', unite_capacite: 'Unités' },
+  { name: 'Zone A', description: ' eefef Zone principale', location: 'Entrepôt 1', capacite_max: 1000, capacite_actuelle: 0, type: 'standard', unite_capacite: 'Unités' },
   { name: 'Zone B', description: 'Zone secondaire', location: 'Entrepôt 1', capacite_max: 500, capacite_actuelle: 0, type: 'standard', unite_capacite: 'Unités' },
   { name: 'Zone C', description: 'Zone froide', location: 'Entrepôt 2', capacite_max: 300, capacite_actuelle: 0, type: 'froide', unite_capacite: 'Volume' },
 ];
