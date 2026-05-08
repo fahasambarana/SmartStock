@@ -1,5 +1,24 @@
 const sequelize = require("./config/database");
+const bcrypt = require("bcryptjs");
+const { Op } = require("sequelize");
 const { Product, Zone, User, Movement, Category, ZoneType } = require("./models/associations");
+
+const BASE_USERS = [
+  {
+    username: "admin",
+    email: "admin@example.com",
+    password: "Admin123!",
+    role: "admin",
+    status: "approved",
+  },
+  {
+    username: "manager",
+    email: "manager@example.com",
+    password: "Manager123!",
+    role: "manager",
+    status: "approved",
+  },
+];
 
 const BASE_ZONE_TYPES = [
   { name: 'Étagère', description: 'Zone de stockage en étagères', capacite_max_default: 500, unite_capacite: 'Unités' },
@@ -16,6 +35,11 @@ const BASE_ZONES = [
   { name: 'Zone C', description: 'Zone froide', location: 'Entrepôt 2', capacite_max: 300, capacite_actuelle: 0, type: 'froide', unite_capacite: 'Volume' },
 ];
 
+const MANAGER_ZONES = [
+  { name: 'Zone Manager A', description: 'Zone de stockage du manager', location: 'Entrepôt Manager', capacite_max: 700, capacite_actuelle: 0, type: 'standard', unite_capacite: 'Unités' },
+  { name: 'Zone Manager Froide', description: 'Zone froide du manager', location: 'Entrepôt Manager', capacite_max: 250, capacite_actuelle: 0, type: 'froide', unite_capacite: 'Volume' },
+];
+
 const BASE_CATEGORIES = [
   { name: 'Aliments', description: 'Produits alimentaires' },
   { name: 'Électronique', description: 'Produits électroniques' },
@@ -26,6 +50,12 @@ const BASE_PRODUCTS = [
   { name: 'Pommes', category: 'Aliments', price: 2.5, quantity: 100, zoneName: 'Zone A', expirationDate: '2024-12-31', volume_unitaire: 0.1, unit: 'kg' },
   { name: 'Ordinateur', category: 'Électronique', price: 999, quantity: 10, zoneName: 'Zone B', expirationDate: null, volume_unitaire: 0.5, unit: 'pièce' },
   { name: 'T-shirt', category: 'Vêtements', price: 15, quantity: 200, zoneName: 'Zone A', expirationDate: null, volume_unitaire: 0.05, unit: 'pièce' },
+];
+
+const MANAGER_PRODUCTS = [
+  { name: 'Riz local', category: 'Aliments', price: 1.8, quantity: 80, zoneName: 'Zone Manager A', expirationDate: '2026-12-31', volume_unitaire: 0.2, unit: 'kg' },
+  { name: 'Yaourt nature', category: 'Aliments', price: 0.9, quantity: 45, zoneName: 'Zone Manager Froide', expirationDate: '2026-06-30', volume_unitaire: 0.05, unit: 'pièce' },
+  { name: 'Casque audio', category: 'Électronique', price: 35, quantity: 12, zoneName: 'Zone Manager A', expirationDate: null, volume_unitaire: 0.15, unit: 'pièce' },
 ];
 
 const BASE_MOVEMENTS = [
@@ -41,6 +71,46 @@ const getMovementImpact = (product, zone, quantityMoved) => {
 
 // ==================== SEEDS ====================
 
+async function seedUsers() {
+  let created = 0;
+  let updated = 0;
+
+  for (const userSeed of BASE_USERS) {
+    const existingUser = await User.findOne({
+      where: {
+        [Op.or]: [
+          { email: userSeed.email },
+          { username: userSeed.username },
+        ],
+      },
+    });
+
+    if (existingUser) {
+      const updates = {};
+      if (existingUser.role !== userSeed.role) updates.role = userSeed.role;
+      if (existingUser.status !== userSeed.status) updates.status = userSeed.status;
+
+      if (Object.keys(updates).length > 0) {
+        await existingUser.update(updates);
+        updated += 1;
+      }
+      continue;
+    }
+
+    const hashedPassword = await bcrypt.hash(userSeed.password, 10);
+    await User.create({
+      username: userSeed.username,
+      email: userSeed.email,
+      password: hashedPassword,
+      role: userSeed.role,
+      status: userSeed.status,
+    });
+    created += 1;
+  }
+
+  console.log(`✓ Utilisateurs seedés : ${created} créés, ${updated} mis à jour`);
+}
+
 async function seedZoneTypes() {
   const existing = await ZoneType.count();
   if (existing > 0) {
@@ -52,40 +122,45 @@ async function seedZoneTypes() {
 }
 
 async function seedZones() {
-  const existing = await Zone.count();
-  if (existing > 0) {
-    console.log(`✓ ${existing} zones existantes`);
-    return;
+  let created = 0;
+
+  for (const zoneSeed of [...BASE_ZONES, ...MANAGER_ZONES]) {
+    const [, wasCreated] = await Zone.findOrCreate({
+      where: { name: zoneSeed.name },
+      defaults: zoneSeed,
+    });
+    if (wasCreated) created += 1;
   }
-  await Zone.bulkCreate(BASE_ZONES);
-  console.log(`✓ ${BASE_ZONES.length} zones créées`);
+
+  const existing = await Zone.count();
+  console.log(`✓ Zones seedées : ${created} créées, ${existing} existantes au total`);
 }
 
 async function seedCategories() {
-  const existing = await Category.count();
-  if (existing > 0) {
-    console.log(`✓ ${existing} categories existantes`);
-    return;
+  let created = 0;
+
+  for (const categorySeed of BASE_CATEGORIES) {
+    const [, wasCreated] = await Category.findOrCreate({
+      where: { name: categorySeed.name },
+      defaults: categorySeed,
+    });
+    if (wasCreated) created += 1;
   }
-  await Category.bulkCreate(BASE_CATEGORIES);
-  console.log(`✓ ${BASE_CATEGORIES.length} categories créées`);
+
+  const existing = await Category.count();
+  console.log(`✓ Catégories seedées : ${created} créées, ${existing} existantes au total`);
 }
 
 async function seedProducts() {
-  const existing = await Product.count();
-  if (existing > 0) {
-    console.log(`✓ ${existing} produits existants`);
-    return;
-  }
-
   // Récupérer les zones et catégories
   const zones = await Zone.findAll();
   const categories = await Category.findAll();
+  const manager = await User.findOne({ where: { role: 'manager', status: 'approved' }, order: [['id', 'ASC']] });
   
   const zoneMap = new Map(zones.map((z) => [z.name, z]));
   const categoryMap = new Map(categories.map((c) => [c.name, c]));
 
-  const productsToCreate = BASE_PRODUCTS.map((p) => {
+  const buildProductPayload = (p, userId = null) => {
     const category = categoryMap.get(p.category);
     if (!category) {
       console.warn(`⚠️ Catégorie "${p.category}" non trouvée pour le produit ${p.name}`);
@@ -100,12 +175,43 @@ async function seedProducts() {
       ZoneId: zoneMap.get(p.zoneName)?.id || null,
       expirationDate: p.expirationDate,
       volume_unitaire: p.volume_unitaire,
-      // UserId sera null pour l'instant
+      UserId: userId,
     };
-  });
+  };
 
-  await Product.bulkCreate(productsToCreate);
-  console.log(`✓ ${productsToCreate.length} produits créés`);
+  let created = 0;
+
+  for (const productSeed of BASE_PRODUCTS) {
+    const payload = buildProductPayload(productSeed);
+    const [, wasCreated] = await Product.findOrCreate({
+      where: {
+        name: productSeed.name,
+        CategoryId: payload.CategoryId,
+        UserId: null,
+      },
+      defaults: payload,
+    });
+    if (wasCreated) created += 1;
+  }
+
+  if (!manager) {
+    console.log("⚠️ Produits manager ignorés : manager approuvé introuvable");
+  } else {
+    for (const productSeed of MANAGER_PRODUCTS) {
+      const payload = buildProductPayload(productSeed, manager.id);
+      const [, wasCreated] = await Product.findOrCreate({
+        where: {
+          name: productSeed.name,
+          UserId: manager.id,
+        },
+        defaults: payload,
+      });
+      if (wasCreated) created += 1;
+    }
+  }
+
+  const existing = await Product.count();
+  console.log(`✓ Produits seedés : ${created} créés, ${existing} existants au total`);
 }
 
 async function seedMovements() {
@@ -151,10 +257,11 @@ async function initializeDatabase() {
 
   // Attention : l'ordre est important !
   await seedZoneTypes();  // 1. D'abord les types de zones
-  await seedZones();      // 2. Ensuite les zones
-  await seedCategories(); // 3. Ensuite les catégories
-  await seedProducts();   // 4. Ensuite les produits (dépend des zones et catégories)
-  await seedMovements();  // 5. Enfin les mouvements
+  await seedUsers();      // 2. Ensuite les utilisateurs admin et manager
+  await seedZones();      // 3. Ensuite les zones
+  await seedCategories(); // 4. Ensuite les catégories
+  await seedProducts();   // 5. Ensuite les produits (dépend des users, zones et catégories)
+  await seedMovements();  // 6. Enfin les mouvements
 
   console.log("🎉 Base de données initialisée avec succès !");
 }
