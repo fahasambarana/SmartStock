@@ -3,13 +3,21 @@ const Product = require("../models/Product");
 const Zone = require("../models/Zone");
 const { Op } = require("sequelize");
 
+const MOVEMENT_TYPE_MAP = {
+  in: "Entrée",
+  out: "Sortie",
+  transfer: "Transfert",
+};
+
 // Create a movement (Entrée, Sortie, or Transfert)
 exports.createMovement = async (req, res) => {
   try {
     const {
       type,
-      ProductId,
-      quantityMoved,
+      ProductId: rawProductId,
+      productId: fallbackProductId,
+      quantityMoved: rawQuantityMoved,
+      quantity,
       sourceZoneId,
       destinationZoneId,
       reason,
@@ -17,7 +25,11 @@ exports.createMovement = async (req, res) => {
       notes,
     } = req.body;
 
-    const product = await Product.findByPk(ProductId);
+    const productId = rawProductId || fallbackProductId;
+    const actualQuantityMoved = parseInt(rawQuantityMoved ?? quantity) || 0;
+    const userId = req.user?.id || UserId;
+
+    const product = await Product.findByPk(productId);
     if (!product) {
       return res.status(404).json({ message: "Produit non trouvé" });
     }
@@ -44,8 +56,8 @@ exports.createMovement = async (req, res) => {
       // Check capacity
       const impact =
         destZone.unite_capacite === "Volume"
-          ? (parseFloat(product.volume_unitaire) || 0) * parseInt(quantityMoved)
-          : parseInt(quantityMoved);
+          ? (parseFloat(product.volume_unitaire) || 0) * actualQuantityMoved
+          : actualQuantityMoved;
 
       if (
         (parseFloat(destZone.capacite_actuelle) || 0) + impact >
@@ -57,7 +69,7 @@ exports.createMovement = async (req, res) => {
       }
 
       // Update product quantity and zone
-      quantityAfter = quantityBefore + parseInt(quantityMoved);
+      quantityAfter = quantityBefore + actualQuantityMoved;
       product.quantity = quantityAfter;
       product.ZoneId = destinationZoneId;
       destZone.capacite_actuelle =
@@ -71,7 +83,7 @@ exports.createMovement = async (req, res) => {
           .json({ message: "Zone source requise pour une sortie" });
       }
 
-      if (quantityBefore < parseInt(quantityMoved)) {
+      if (quantityBefore < actualQuantityMoved) {
         return res
           .status(400)
           .json({ message: "Quantité insuffisante pour la sortie" });
@@ -83,13 +95,13 @@ exports.createMovement = async (req, res) => {
       }
 
       // Update product quantity and zone
-      quantityAfter = quantityBefore - parseInt(quantityMoved);
+      quantityAfter = quantityBefore - actualQuantityMoved;
       product.quantity = quantityAfter;
 
       const impact =
         srcZone.unite_capacite === "Volume"
-          ? (parseFloat(product.volume_unitaire) || 0) * parseInt(quantityMoved)
-          : parseInt(quantityMoved);
+          ? (parseFloat(product.volume_unitaire) || 0) * actualQuantityMoved
+          : actualQuantityMoved;
 
       srcZone.capacite_actuelle = Math.max(
         0,
@@ -104,7 +116,7 @@ exports.createMovement = async (req, res) => {
         });
       }
 
-      if (quantityBefore < parseInt(quantityMoved)) {
+      if (quantityBefore < actualQuantityMoved) {
         return res
           .status(400)
           .json({ message: "Quantité insuffisante pour le transfert" });
@@ -122,13 +134,13 @@ exports.createMovement = async (req, res) => {
       // Calculate impacts
       const srcImpact =
         srcZone.unite_capacite === "Volume"
-          ? (parseFloat(product.volume_unitaire) || 0) * parseInt(quantityMoved)
-          : parseInt(quantityMoved);
+          ? (parseFloat(product.volume_unitaire) || 0) * actualQuantityMoved
+          : actualQuantityMoved;
 
       const destImpact =
         destZone.unite_capacite === "Volume"
-          ? (parseFloat(product.volume_unitaire) || 0) * parseInt(quantityMoved)
-          : parseInt(quantityMoved);
+          ? (parseFloat(product.volume_unitaire) || 0) * actualQuantityMoved
+          : actualQuantityMoved;
 
       // Check destination capacity
       if (
@@ -158,17 +170,25 @@ exports.createMovement = async (req, res) => {
     // Save product changes
     await product.save();
 
+    const sourceZone = sourceZoneId ? await Zone.findByPk(sourceZoneId) : null;
+    const destinationZone = destinationZoneId ? await Zone.findByPk(destinationZoneId) : null;
+    const userName = req.user?.username || "Système";
+
     // Create movement record
     const movement = await Movement.create({
       type,
-      productId: ProductId,
+      productId,
+      productName: product.name,
+      sourceZoneId: sourceZoneId || null,
+      sourceZoneName: sourceZone?.name || null,
+      destinationZoneId: destinationZoneId || null,
+      destinationZoneName: destinationZone?.name || null,
+      userId,
+      userName,
       quantityBefore,
       quantityAfter,
-      quantityMoved: parseInt(quantityMoved),
-      sourceZoneId: sourceZoneId || null,
-      destinationZoneId: destinationZoneId || null,
+      quantityMoved: actualQuantityMoved,
       reason,
-      userId: UserId,
       notes,
     });
 
@@ -177,7 +197,8 @@ exports.createMovement = async (req, res) => {
       include: [
         {
           model: Product,
-          attributes: ["id", "name", "category", "price"],
+          as: "product",
+          attributes: ["id", "name", "price", "CategoryId"],
         },
         {
           model: Zone,
@@ -192,11 +213,112 @@ exports.createMovement = async (req, res) => {
       ],
     });
 
-    return res.status(201).json(fullMovement);
+    return res.status(201).json({ success: true, movement: fullMovement });
   } catch (error) {
     res
       .status(500)
       .json({ message: "Erreur création mouvement", error: error.message });
+  }
+};
+
+exports.createInMovement = async (req, res) => {
+  req.body.type = MOVEMENT_TYPE_MAP.in;
+  req.body.ProductId = req.body.productId || req.body.ProductId;
+  req.body.quantityMoved = req.body.quantity ?? req.body.quantityMoved;
+  return exports.createMovement(req, res);
+};
+
+exports.createOutMovement = async (req, res) => {
+  req.body.type = MOVEMENT_TYPE_MAP.out;
+  req.body.ProductId = req.body.productId || req.body.ProductId;
+  req.body.quantityMoved = req.body.quantity ?? req.body.quantityMoved;
+  return exports.createMovement(req, res);
+};
+
+exports.createTransferMovement = async (req, res) => {
+  req.body.type = MOVEMENT_TYPE_MAP.transfer;
+  req.body.ProductId = req.body.productId || req.body.ProductId;
+  req.body.quantityMoved = req.body.quantity ?? req.body.quantityMoved;
+  return exports.createMovement(req, res);
+};
+
+exports.getMovementsByType = async (req, res) => {
+  try {
+    const movementType = MOVEMENT_TYPE_MAP[req.params.type];
+    if (!movementType) {
+      return res.status(400).json({ message: "Type de mouvement invalide" });
+    }
+
+    const movements = await Movement.findAll({
+      where: { type: movementType },
+      include: [
+        {
+          model: Product,
+          as: "product",
+          attributes: ["id", "name", "price", "CategoryId"],
+        },
+        {
+          model: Zone,
+          as: "sourceZone",
+          attributes: ["id", "name", "location"],
+        },
+        {
+          model: Zone,
+          as: "destinationZone",
+          attributes: ["id", "name", "location"],
+        },
+      ],
+      order: [["createdAt", "DESC"]],
+    });
+
+    res.json({ data: movements });
+  } catch (error) {
+    res.status(500).json({
+      message: "Erreur récupération mouvements par type",
+      error: error.message,
+    });
+  }
+};
+
+exports.getMovementStats = async (req, res) => {
+  try {
+    const total = await Movement.count();
+    const totalIn = await Movement.count({ where: { type: MOVEMENT_TYPE_MAP.in } });
+    const totalOut = await Movement.count({ where: { type: MOVEMENT_TYPE_MAP.out } });
+    const totalTransfer = await Movement.count({ where: { type: MOVEMENT_TYPE_MAP.transfer } });
+
+    res.json({
+      total,
+      stats: {
+        in: totalIn,
+        out: totalOut,
+        transfer: totalTransfer,
+      },
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: "Erreur récupération statistiques des mouvements",
+      error: error.message,
+    });
+  }
+};
+
+exports.cancelMovement = async (req, res) => {
+  try {
+    const movement = await Movement.findByPk(req.params.id);
+    if (!movement) {
+      return res.status(404).json({ message: "Mouvement non trouvé" });
+    }
+
+    movement.status = "cancelled";
+    await movement.save();
+
+    res.json({ success: true, message: "Mouvement annulé", movement });
+  } catch (error) {
+    res.status(500).json({
+      message: "Erreur annulation mouvement",
+      error: error.message,
+    });
   }
 };
 
@@ -207,7 +329,8 @@ exports.getAllMovements = async (req, res) => {
       include: [
         {
           model: Product,
-          attributes: ["id", "name", "category", "price"],
+          as: "product",
+          attributes: ["id", "name", "price", "CategoryId"],
         },
         {
           model: Zone,
@@ -240,7 +363,8 @@ exports.getProductMovements = async (req, res) => {
       include: [
         {
           model: Product,
-          attributes: ["id", "name", "category"],
+          as: "product",
+          attributes: ["id", "name", "CategoryId"],
         },
         {
           model: Zone,
@@ -278,7 +402,8 @@ exports.getZoneMovements = async (req, res) => {
       include: [
         {
           model: Product,
-          attributes: ["id", "name", "category"],
+          as: "product",
+          attributes: ["id", "name", "price", "CategoryId"],
         },
         {
           model: Zone,
@@ -310,7 +435,8 @@ exports.getMovementById = async (req, res) => {
       include: [
         {
           model: Product,
-          attributes: ["id", "name", "category", "price"],
+          as: "product",
+          attributes: ["id", "name", "price", "CategoryId"],
         },
         {
           model: Zone,

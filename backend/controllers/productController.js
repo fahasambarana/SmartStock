@@ -1,133 +1,124 @@
-const Product = require('../models/Product');
-const Zone = require('../models/Zone');
+const { Product, Zone, Category, User } = require('../models/associations');
+const { Op } = require('sequelize');
 
-// Create a new product
-exports.createProduct = async (req, res) => {
-  try {
-    const { name, category, price, quantity, ZoneId, expirationDate, volume_unitaire } = req.body;
-    
-    // Convert empty string expirationDate to null for DB compliance
-    const validExpiration = expirationDate ? expirationDate : null;
-
-    if (ZoneId) {
-      const zone = await Zone.findByPk(ZoneId);
-      if (!zone) {
-        return res.status(404).json({ message: 'Zone not found' });
-      }
-
-      // Logic validation Capacity: 
-      // If "Unités", calculation ignores volume and compares quantities.
-      // If "Volume", (Volume_unitaire * Quantité_entrante) + capacite_actuelle <= capacite_max.
-      const impact = zone.unite_capacite === 'Volume' 
-        ? (parseFloat(volume_unitaire) || 0) * parseInt(quantity)
-        : parseInt(quantity);
-
-      if ((parseFloat(zone.capacite_actuelle) || 0) + impact > parseFloat(zone.capacite_max)) {
-        return res.status(400).json({ message: `Action Impossible : Saturation de l'espace [${zone.name}]` });
-      }
-
-      // Create product
-      const product = await Product.create({ 
-        name, 
-        category, 
-        price, 
-        quantity: parseInt(quantity) || 0, 
-        ZoneId: ZoneId, 
-        expirationDate: validExpiration,
-        volume_unitaire: parseFloat(volume_unitaire) || 0
-      });
-
-      // Update zone capacity
-      zone.capacite_actuelle = (parseFloat(zone.capacite_actuelle) || 0) + impact;
-      await zone.save();
-
-      return res.status(201).json(product);
-    }
-
-    // Product without zone
-    const product = await Product.create({ 
-      name, 
-      category, 
-      price, 
-      quantity: parseInt(quantity) || 0, 
-      ZoneId: null, 
-      expirationDate: validExpiration,
-      volume_unitaire: parseFloat(volume_unitaire) || 0
-    });
-    
-    res.status(201).json(product);
-  } catch (error) {
-    res.status(500).json({ message: 'Error creating product', error: error.message });
-  }
-};
-
-// Get all products
 exports.getAllProducts = async (req, res) => {
   try {
+    const { CategoryId, UserId } = req.query;
+    const where = {};
+    
+    // If not admin, only see own products
+    if (req.user.role === 'manager') {
+      where.UserId = req.user.id;
+    } else if (req.user.role === 'admin') {
+      if (UserId && UserId !== '') {
+        where.UserId = UserId;
+      } else {
+        // Admins see all manager products by default
+        where.UserId = { [Op.ne]: null };
+      }
+    }
+
+    if (CategoryId && CategoryId !== '') {
+      where.CategoryId = CategoryId;
+    }
+
     const products = await Product.findAll({
+      where,
       include: [
-        { model: Zone, attributes: ['id', 'name', 'location'] }
+        { model: Zone, attributes: ['name'] },
+        { model: Category, attributes: ['name'] },
+        { model: User, as: 'manager', attributes: ['username'] }
       ],
       order: [['createdAt', 'DESC']]
     });
     res.json(products);
   } catch (error) {
-    res.status(500).json({ message: 'Error fetching products', error: error.message });
+    console.error('Erreur getAllProducts:', error);
+    res.status(500).json({ message: error.message });
   }
 };
 
-// Get a single product by ID
+exports.createProduct = async (req, res) => {
+  try {
+    const { name, CategoryId, quantity, price, ZoneId, expirationDate, volume_unitaire } = req.body;
+    
+    // Validate if template exists
+    const template = await Product.findOne({
+      where: { 
+        name, 
+        CategoryId, 
+        UserId: null 
+      }
+    });
+
+    if (!template && req.user.role !== 'admin') {
+      return res.status(400).json({ message: "Ce produit n'est pas autorisé dans cette catégorie." });
+    }
+
+    const product = await Product.create({
+      name,
+      CategoryId,
+      UserId: req.user.id,
+      quantity: parseInt(quantity) || 0,
+      price: parseFloat(price) || 0,
+      ZoneId: ZoneId || null,
+      expirationDate: expirationDate || null,
+      volume_unitaire: parseFloat(volume_unitaire) || 0,
+      unit: template?.unit || null
+    });
+
+    res.status(201).json(product);
+  } catch (error) {
+    console.error('Erreur createProduct:', error);
+    res.status(400).json({ message: error.message });
+  }
+};
+
 exports.getProductById = async (req, res) => {
   try {
     const product = await Product.findByPk(req.params.id, {
       include: [
-        { model: Zone, attributes: ['id', 'name', 'location'] }
+        { model: Zone },
+        { model: Category },
+        { model: User, as: 'manager', attributes: ['username'] }
       ]
     });
-    if (!product) {
-      return res.status(404).json({ message: 'Product not found' });
-    }
+    if (!product) return res.status(404).json({ message: 'Produit non trouvé' });
     res.json(product);
   } catch (error) {
-    res.status(500).json({ message: 'Error fetching product', error: error.message });
+    res.status(500).json({ message: error.message });
   }
 };
 
-// Update a product
 exports.updateProduct = async (req, res) => {
   try {
-    const { name, category, price, quantity, ZoneId, expirationDate } = req.body;
     const product = await Product.findByPk(req.params.id);
-    
-    if (!product) {
-      return res.status(404).json({ message: 'Product not found' });
+    if (!product) return res.status(404).json({ message: 'Produit non trouvé' });
+
+    // Check ownership
+    if (req.user.role === 'manager' && product.UserId !== req.user.id) {
+      return res.status(403).json({ message: "Non autorisé" });
     }
 
-    product.name = name !== undefined ? name : product.name;
-    product.category = category !== undefined ? category : product.category;
-    product.price = price !== undefined ? price : product.price;
-    product.quantity = quantity !== undefined ? quantity : product.quantity;
-    product.ZoneId = ZoneId !== undefined ? (ZoneId || null) : product.ZoneId;
-    product.expirationDate = expirationDate !== undefined ? (expirationDate || null) : product.expirationDate;
-
-    await product.save();
+    await product.update(req.body);
     res.json(product);
   } catch (error) {
-    res.status(500).json({ message: 'Error updating product', error: error.message });
+    res.status(400).json({ message: error.message });
   }
 };
 
-// Delete a product
 exports.deleteProduct = async (req, res) => {
   try {
     const product = await Product.findByPk(req.params.id);
-    if (!product) {
-      return res.status(404).json({ message: 'Product not found' });
+    if (!product) return res.status(404).json({ message: 'Produit non trouvé' });
+
+    if (req.user.role === 'manager' && product.UserId !== req.user.id) {
+      return res.status(403).json({ message: "Non autorisé" });
     }
 
     await product.destroy();
-    res.json({ message: 'Product deleted successfully' });
+    res.json({ message: 'Produit supprimé' });
   } catch (error) {
-    res.status(500).json({ message: 'Error deleting product', error: error.message });
+    res.status(500).json({ message: error.message });
   }
 };

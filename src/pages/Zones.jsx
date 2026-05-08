@@ -3,52 +3,57 @@ import Table from "../components/Table";
 import Modal from "../components/Modal";
 import { FiPlus, FiAlertCircle } from "react-icons/fi";
 import { useAuth } from "../contexts/AuthContext";
-import { getZones, createZone, updateZone, deleteZone } from "../services/api";
+import { getZones, createZone, updateZone, deleteZone, getZoneTypes } from "../services/api";
 
-const ZONE_TYPES = [
-  "Étagère",
-  "Palette",
-  "Chambre Froide",
-  "Rack",
-  "Zone de Quai",
-  "Armoire",
-];
+const EMPTY_ZONE_FORM = {
+  name: "",
+  description: "",
+  location: "",
+  unite_capacite: "Unités",
+  capacite_max: "",
+  capacite_type: "",
+  type: "",
+  ZoneTypeId: "",
+};
 
 const Zones = () => {
   const [zones, setZones] = useState([]);
+  const [zoneTypes, setZoneTypes] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingZone, setEditingZone] = useState(null);
-  const [formData, setFormData] = useState({
-    name: "",
-    description: "",
-    location: "",
-    unite_capacite: "Unités",
-    capacite_max: "",
-    capacite_type: "",
-    type: "",
-  });
+  const [formData, setFormData] = useState(EMPTY_ZONE_FORM);
   const [customType, setCustomType] = useState("");
   const [showCustomType, setShowCustomType] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { user } = useAuth();
 
-  const canEdit = user?.role === "Admin" || user?.role === "Manager";
+  const canManageZones = user?.role === "manager";
 
   const columns = [
-    { key: "name", label: "Nom" },
-    { key: "type", label: "Type" },
+    { key: "name", label: "Zone principale" },
+    { key: "type", label: "Type interne" },
     { key: "unite_capacite", label: "Unité" },
-    { key: "capacite_max", label: "Cap. Max" },
-    // { key: 'capacite_type', label: 'Cap. Type' },
+    { key: "capacite_max", label: "Cap. zone" },
+    { key: "capacite_type", label: "Cap. type" },
     { key: "capacite_actuelle", label: "Utilisée" },
   ];
 
   useEffect(() => {
     fetchZones();
+    fetchZoneTypes();
   }, []);
+
+  const fetchZoneTypes = async () => {
+    try {
+      const response = await getZoneTypes();
+      setZoneTypes(response.data);
+    } catch (err) {
+      console.error("Erreur chargement types de zones:", err);
+    }
+  };
 
   const fetchZones = async () => {
     try {
@@ -66,15 +71,7 @@ const Zones = () => {
 
   const handleAdd = () => {
     setEditingZone(null);
-    setFormData({
-      name: "",
-      description: "",
-      location: "",
-      unite_capacite: "Unités",
-      capacite_max: "",
-      capacite_type: "",
-      type: "",
-    });
+    setFormData(EMPTY_ZONE_FORM);
     setCustomType("");
     setShowCustomType(false);
     setIsModalOpen(true);
@@ -82,7 +79,10 @@ const Zones = () => {
 
   const handleEdit = (zone) => {
     setEditingZone(zone);
-    const isStandardType = ZONE_TYPES.includes(zone.type);
+    const knownType = zoneTypes.some((zoneType) => zoneType.name === zone.type);
+    const hasSavedTypeModel = Boolean(zone.ZoneTypeId || zone.ZoneType?.id);
+    const isCustomType = Boolean(zone.type) && !knownType && !hasSavedTypeModel;
+
     setFormData({
       name: zone.name,
       description: zone.description || "",
@@ -90,10 +90,11 @@ const Zones = () => {
       unite_capacite: zone.unite_capacite || "Unités",
       capacite_max: zone.capacite_max || "",
       capacite_type: zone.capacite_type || "",
-      type: ZONE_TYPES.includes(zone.type) ? zone.type : "Autre",
+      type: isCustomType ? "Autre" : zone.type || "",
+      ZoneTypeId: zone.ZoneTypeId || zone.ZoneType?.id || "",
     });
-    setCustomType(!ZONE_TYPES.includes(zone.type) ? zone.type || "" : "");
-    setShowCustomType(!ZONE_TYPES.includes(zone.type) && !!zone.type);
+    setCustomType(isCustomType ? zone.type : "");
+    setShowCustomType(isCustomType);
     setIsModalOpen(true);
   };
 
@@ -117,8 +118,15 @@ const Zones = () => {
     e.preventDefault();
     setIsSubmitting(true);
 
-    const finalType = formData.type === "Autre" ? customType : formData.type;
-    const submissionData = { ...formData, type: finalType };
+    const finalType = formData.type === "Autre" ? customType.trim() : formData.type;
+    const submissionData = {
+      ...formData,
+      name: formData.name.trim(),
+      location: formData.location.trim(),
+      description: formData.description.trim(),
+      type: finalType,
+      ZoneTypeId: formData.type === "Autre" ? "" : formData.ZoneTypeId,
+    };
 
     try {
       if (editingZone) {
@@ -161,12 +169,14 @@ const Zones = () => {
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold text-gray-800">Zones</h1>
-        <button
-          onClick={handleAdd}
-          className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 flex items-center transition-colors shadow-sm">
-          <FiPlus className="w-5 h-5 mr-2" />
-          Ajouter une Zone
-        </button>
+        {canManageZones && (
+          <button
+            onClick={handleAdd}
+            className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 flex items-center transition-colors shadow-sm">
+            <FiPlus className="w-5 h-5 mr-2" />
+            Ajouter une Zone
+          </button>
+        )}
       </div>
 
       {error && (
@@ -190,8 +200,8 @@ const Zones = () => {
         <Table
           columns={columns}
           data={filteredZones}
-          onEdit={handleEdit}
-          onDelete={handleDelete}
+          onEdit={canManageZones ? handleEdit : null}
+          onDelete={canManageZones ? handleDelete : null}
         />
         {filteredZones.length === 0 && !error && (
           <div className="p-8 text-center text-gray-500">
@@ -207,7 +217,7 @@ const Zones = () => {
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Nom de la zone <span className="text-red-500">*</span>
+              Zone principale <span className="text-red-500">*</span>
             </label>
             <input
               type="text"
@@ -216,7 +226,7 @@ const Zones = () => {
                 setFormData({ ...formData, name: e.target.value })
               }
               className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-              placeholder="Ex: Entrepôt Principal"
+              placeholder="Ex: Entrepôt principal"
               required
             />
           </div>
@@ -234,10 +244,10 @@ const Zones = () => {
               placeholder="Ex: Bâtiment A, Étage 1"
             />
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Unité de Capacité
+                Unité de capacité
               </label>
               <select
                 value={formData.unite_capacite}
@@ -251,7 +261,7 @@ const Zones = () => {
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Capacité Max <span className="text-red-500">*</span>
+                Capacité max de la zone principale <span className="text-red-500">*</span>
               </label>
               <input
                 type="number"
@@ -267,34 +277,37 @@ const Zones = () => {
               />
             </div>
           </div>
-          {/* <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Capacité Type</label>
-            <input
-              type="number"
-              step="0.01"
-              min="0"
-              value={formData.capacite_type}
-              onChange={(e) => setFormData({ ...formData, capacite_type: e.target.value })}
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-              placeholder="0.00"
-            />
-          </div> */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Type de Zone
+              Type de zone interne
             </label>
             <select
               value={formData.type}
               onChange={(e) => {
-                setFormData({ ...formData, type: e.target.value });
-                setShowCustomType(e.target.value === "Autre");
+                const selectedTypeName = e.target.value;
+                const selectedType = zoneTypes.find((zt) => zt.name === selectedTypeName);
+
+                setFormData({
+                  ...formData,
+                  type: selectedTypeName,
+                  ZoneTypeId: selectedType?.id || "",
+                  capacite_type:
+                    selectedTypeName === "Autre"
+                      ? formData.capacite_type
+                      : selectedType?.capacite_max_default || formData.capacite_type,
+                  unite_capacite:
+                    selectedTypeName === "Autre"
+                      ? formData.unite_capacite
+                      : selectedType?.unite_capacite || formData.unite_capacite,
+                });
+                setShowCustomType(selectedTypeName === "Autre");
               }}
               className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
               required>
-              <option value="">-- Sélectionner --</option>
-              {ZONE_TYPES.map((t) => (
-                <option key={t} value={t}>
-                  {t}
+              <option value="">-- Sélectionner un type --</option>
+              {zoneTypes.map((t) => (
+                <option key={t.id} value={t.name}>
+                  {t.name} ({t.capacite_max_default} {t.unite_capacite})
                 </option>
               ))}
               <option value="Autre">Autre...</option>
@@ -311,11 +324,28 @@ const Zones = () => {
                 value={customType}
                 onChange={(e) => setCustomType(e.target.value)}
                 className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                placeholder="Ex: Conteneur, Rack Mobile..."
+                placeholder="Ex: Armoire, Conteneur, Rack mobile..."
                 required={showCustomType}
               />
             </div>
           )}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Capacité max de ce type <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="number"
+              step="0.01"
+              min="0"
+              value={formData.capacite_type}
+              onChange={(e) =>
+                setFormData({ ...formData, capacite_type: e.target.value })
+              }
+              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+              placeholder="Ex: 300"
+              required
+            />
+          </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Description

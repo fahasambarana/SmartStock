@@ -98,16 +98,18 @@ const Movements = () => {
             </div>
           )}
           
-          <button
-            onClick={() => {
-              setMovementType(activeTab);
-              setShowAddModal(true);
-            }}
-            className={`${nmFlat} ${nmButton} px-6 py-3 rounded-2xl flex items-center gap-2 font-bold text-indigo-600`}
-          >
-            <FiPlus size={20} />
-            Ajouter un mouvement
-          </button>
+          {user?.role === 'manager' && (
+            <button
+              onClick={() => {
+                setMovementType(activeTab);
+                setShowAddModal(true);
+              }}
+              className={`${nmFlat} ${nmButton} px-6 py-3 rounded-2xl flex items-center gap-2 font-bold text-indigo-600`}
+            >
+              <FiPlus size={20} />
+              Ajouter un mouvement
+            </button>
+          )}
         </div>
       </div>
 
@@ -235,16 +237,18 @@ const Movements = () => {
           <p className="text-gray-400 font-bold italic mb-4">
             Aucun mouvement {currentTab.label.toLowerCase()} trouvé
           </p>
-          <button
-            onClick={() => {
-              setMovementType(activeTab);
-              setShowAddModal(true);
-            }}
-            className={`${nmFlat} ${nmButton} px-6 py-3 rounded-2xl flex items-center gap-2 font-bold text-indigo-600 mx-auto`}
-          >
-            <FiPlus size={20} />
-            Ajouter une {currentTab.label.toLowerCase()}
-          </button>
+          {user?.role === 'manager' && (
+            <button
+              onClick={() => {
+                setMovementType(activeTab);
+                setShowAddModal(true);
+              }}
+              className={`${nmFlat} ${nmButton} px-6 py-3 rounded-2xl flex items-center gap-2 font-bold text-indigo-600 mx-auto`}
+            >
+              <FiPlus size={20} />
+              Ajouter une {currentTab.label.toLowerCase()}
+            </button>
+          )}
         </div>
       )}
 

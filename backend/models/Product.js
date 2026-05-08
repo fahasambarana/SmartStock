@@ -11,14 +11,34 @@ const Product = sequelize.define('Product', {
     type: DataTypes.STRING,
     allowNull: false,
   },
-  category: {
-    type: DataTypes.ENUM('Alimentaire', 'Food', 'Electronics', 'Cosmetics', 'Other'),
-    allowNull: false,
-    defaultValue: 'Other',
+  unit: {
+    type: DataTypes.STRING(50),
+    allowNull: true,
+  },
+  CategoryId: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    references: {
+      model: 'Categories',
+      key: 'id',
+      onDelete: 'SET NULL',
+      onUpdate: 'CASCADE'
+    }
+  },
+  UserId: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    references: {
+      model: 'users',
+      key: 'id',
+      onDelete: 'SET NULL',
+      onUpdate: 'CASCADE'
+    }
   },
   price: {
     type: DataTypes.FLOAT,
-    allowNull: false,
+    allowNull: true,
+    defaultValue: 0,
   },
   quantity: {
     type: DataTypes.INTEGER,
@@ -31,6 +51,8 @@ const Product = sequelize.define('Product', {
     references: {
       model: 'Zones',
       key: 'id',
+      onDelete: 'SET NULL',
+      onUpdate: 'CASCADE'
     }
   },
   expirationDate: {

@@ -1,300 +1,267 @@
-import { useState, useEffect } from 'react';
-import Modal from '../components/Modal';
-import { FiPlus, FiAlertCircle, FiEdit2, FiTrash2, FiSearch, FiPackage } from 'react-icons/fi';
+import React, { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { FiPlus, FiTrash2, FiEdit2, FiBox, FiFilter, FiUser, FiLayers, FiTag } from 'react-icons/fi';
+import api from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
-import { getProducts, createProduct, updateProduct, deleteProduct, getZones } from '../services/api';
 
 const Products = () => {
+  const { user } = useAuth();
   const [products, setProducts] = useState([]);
-  const [availableZones, setAvailableZones] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [categories, setCategories] = useState([]);
+  const [managers, setManagers] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
+  const [filters, setFilters] = useState({ categoryId: '', managerId: '' });
+  
+  // Form state
   const [formData, setFormData] = useState({
     name: '',
-    category: 'Alimentaire',
-    price: '',
-    quantity: '',
+    CategoryId: '',
+    quantity: 0,
+    price: 0,
     ZoneId: '',
     expirationDate: '',
-    volume_unitaire: '',
+    volume_unitaire: 0
   });
-  const [searchTerm, setSearchTerm] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const { user } = useAuth();
 
-  // --- STYLES NEUMORPHISMES DYNAMIQUES (DARK MODE READY) ---
-  const nmBg = "bg-[#e0e5ec] dark:bg-[#1a1d23]";
   const nmFlat = "bg-[#e0e5ec] dark:bg-[#1a1d23] shadow-[9px_9px_16px_rgb(163,177,198,0.6),-9px_-9px_16px_rgba(255,255,255,0.5)] dark:shadow-[6px_6px_12px_#0e1013,-6px_-6px_12px_rgba(255,255,255,0.05)]";
   const nmInset = "bg-[#e0e5ec] dark:bg-[#1a1d23] shadow-[inset_6px_6px_12px_#b8b9be,inset_-6px_-6px_12px_#ffffff] dark:shadow-[inset_4px_4px_8px_#0e1013,inset_-4px_-4px_8px_rgba(255,255,255,0.05)]";
-  const nmButton = "active:shadow-[inset_4px_4px_8px_#b8b9be,inset_-4px_-4px_8px_#ffffff] dark:active:shadow-[inset_3px_3px_6px_#0e1013,inset_-3px_-3px_6px_rgba(255,255,255,0.05)] transition-all duration-200";
+  const nmButton = "active:shadow-[inset_4px_4px_8px_#b8b9be,inset_-4px_-4px_8px_#ffffff] transition-all duration-200";
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [filters]);
 
   const fetchData = async () => {
     try {
-      setIsLoading(true);
-      const [productsRes, zonesRes] = await Promise.all([getProducts(), getZones()]);
-      setProducts(productsRes.data);
-      setAvailableZones(zonesRes.data);
-      setError(null);
-    } catch (err) {
-      setError('Erreur lors du chargement des données');
-    } finally {
-      setIsLoading(false);
-    }
-  };
+      setLoading(true);
+      const params = new URLSearchParams();
+      if (filters.categoryId) params.append('CategoryId', filters.categoryId);
+      if (filters.managerId) params.append('UserId', filters.managerId);
+      
+      const [prodRes, catRes, userRes] = await Promise.all([
+        api.get(`/products?${params.toString()}`),
+        api.get('/categories'),
+        user.role === 'admin' ? api.get('/users') : Promise.resolve({ data: { data: [] } })
+      ]);
 
-  const handleAdd = () => {
-    setEditingProduct(null);
-    setFormData({ name: '', category: 'Food', price: '', quantity: '', ZoneId: '', expirationDate: '' });
-    setIsModalOpen(true);
-  };
-
-  const handleEdit = (product) => {
-    setEditingProduct(product);
-    setFormData({
-      name: product.name,
-      category: product.category,
-      price: product.price,
-      quantity: product.quantity,
-      ZoneId: product.ZoneId || '',
-      expirationDate: product.expirationDate || '',
-      volume_unitaire: product.volume_unitaire || '',
-    });
-    setIsModalOpen(true);
-  };
-
-  const handleDelete = async (product) => {
-    if (window.confirm(`Supprimer le produit "${product.name}" ?`)) {
-      try {
-        await deleteProduct(product.id);
-        fetchData();
-      } catch (err) {
-        alert('Erreur lors de la suppression');
+      setProducts(prodRes.data);
+      setCategories(catRes.data);
+      if (user.role === 'admin') {
+        setManagers(userRes.data.data.filter(u => u.role === 'manager'));
       }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
     }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setIsSubmitting(true);
-    const finalData = { ...formData, ZoneId: formData.ZoneId === '' ? null : formData.ZoneId };
-
     try {
-      editingProduct ? await updateProduct(editingProduct.id, finalData) : await createProduct(finalData);
+      if (editingProduct) {
+        await api.put(`/products/${editingProduct.id}`, formData);
+      } else {
+        await api.post('/products', formData);
+      }
       setIsModalOpen(false);
       fetchData();
     } catch (err) {
-      alert(err.response?.data?.message || 'Erreur lors de l\'enregistrement');
-    } finally {
-      setIsSubmitting(false);
+      alert(err.response?.data?.message || "Erreur");
     }
   };
 
-  const filteredProducts = products.filter(product =>
-    product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    product.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (product.Zone && product.Zone.name.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
-
-  if (isLoading) {
-    return (
-      <div className={`min-h-screen ${nmBg} flex justify-center items-center transition-colors duration-300`}>
-        <div className="animate-spin rounded-full h-12 w-12 border-b-4 border-blue-500"></div>
-      </div>
-    );
-  }
+  // Get template names for selected category
+  const selectedCategory = categories.find(c => c.id === parseInt(formData.CategoryId));
+  const availableTemplates = selectedCategory?.Products || [];
 
   return (
-    <div className={`min-h-screen ${nmBg} p-8 text-gray-700 dark:text-gray-200 transition-colors duration-300`}>
-      {/* Header */}
-      <div className="flex flex-col md:flex-row justify-between items-center mb-10 gap-4">
-        <h1 className="text-3xl font-extrabold text-[#44474a] dark:text-gray-100 flex items-center tracking-tighter uppercase ">
-          <FiPackage className="mr-3 text-blue-500 dark:text-blue-400" /> Produits
-        </h1>
-        <button
-          onClick={handleAdd}
-          className={`${nmFlat} ${nmButton} px-6 py-3 rounded-xl flex items-center font-bold text-blue-600 dark:text-blue-400`}
-        >
-          <FiPlus className="mr-2 stroke-[3px]" /> Ajouter un Produit
-        </button>
-      </div>
-
-      {/* Barre de recherche */}
-      <div className={`${nmInset} flex items-center px-5 py-3 rounded-2xl mb-8`}>
-        <FiSearch className="text-gray-400 dark:text-gray-500 mr-3" />
-        <input
-          type="text"
-          placeholder="Rechercher un produit, une catégorie..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="bg-transparent w-full outline-none text-gray-600 dark:text-gray-300 placeholder-gray-400"
-        />
-      </div>
-
-      {error && (
-        <div className={`${nmFlat} p-4 rounded-xl mb-6 flex items-center text-red-500 font-medium`}>
-          <FiAlertCircle className="mr-2" /> {error}
-        </div>
-      )}
-
-      {/* Table Neumorphique */}
-      <div className={`${nmFlat} rounded-3xl overflow-hidden`}>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="border-b border-gray-300/40 dark:border-white/5">
-                <th className="p-5 font-bold text-gray-500 dark:text-gray-400 uppercase text-xs">Produit</th>
-                <th className="p-5 font-bold text-gray-500 dark:text-gray-400 uppercase text-xs">Catégorie</th>
-                <th className="p-5 font-bold text-gray-500 dark:text-gray-400 uppercase text-xs">Prix</th>
-                <th className="p-5 font-bold text-gray-500 dark:text-gray-400 uppercase text-xs">Quantité</th>
-                <th className="p-5 font-bold text-gray-500 dark:text-gray-400 uppercase text-xs">Zone</th>
-                <th className="p-5 font-bold text-gray-500 dark:text-gray-400 uppercase text-xs text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredProducts.map((product) => (
-                <tr key={product.id} className="hover:bg-white/20 dark:hover:bg-white/5 transition-colors">
-                  <td className="p-5 font-semibold text-gray-800 dark:text-gray-200">{product.name}</td>
-                  <td className="p-5">
-                    <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase bg-gray-200 dark:bg-[#252a33] text-gray-600 dark:text-gray-400 shadow-sm">
-                      {product.category}
-                    </span>
-                  </td>
-                  <td className="p-5 font-mono dark:text-gray-300">{product.price} MGA</td>
-                  <td className="p-5">
-                    <span className={`font-bold ${product.quantity < 5 ? 'text-red-500 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>
-                      {product.quantity}
-                    </span>
-                  </td>
-                  <td className="p-5 text-gray-500 dark:text-gray-400 text-sm italic">
-                    {product.Zone ? product.Zone.name : 'Non assigné'}
-                  </td>
-                  <td className="p-5 text-right">
-                    <div className="flex justify-end gap-3">
-                      <button onClick={() => handleEdit(product)} className={`${nmFlat} ${nmButton} p-2 rounded-lg text-amber-600 dark:text-amber-500`}>
-                        <FiEdit2 size={16} />
-                      </button>
-                      <button onClick={() => handleDelete(product)} className={`${nmFlat} ${nmButton} p-2 rounded-lg text-red-500 dark:text-red-400`}>
-                        <FiTrash2 size={16} />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        {filteredProducts.length === 0 && (
-          <div className="p-10 text-center text-gray-400 italic">Aucun produit trouvé.</div>
-        )}
-      </div>
-
-      {/* Modal Neumorphique */}
-      <Modal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        title={editingProduct ? 'Modifier le Produit' : 'Nouveau Produit'}
-      >
-        <form onSubmit={handleSubmit} className="space-y-5 p-2">
+    <div className="p-4 md:p-8 max-w-7xl mx-auto">
+      {/* Header & Filters */}
+      <div className="flex flex-col gap-8 mb-10">
+        <div className="flex justify-between items-center">
           <div>
-            <label className="block text-xs font-bold uppercase text-gray-500 dark:text-gray-400 mb-2 ml-1">Nom du Produit</label>
-            <input
-              type="text"
-              value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              className={`${nmInset} w-full p-3 rounded-xl outline-none focus:text-blue-600 dark:focus:text-blue-400 text-gray-700 dark:text-gray-200 transition-all`}
-              placeholder="Ex: iPhone 15"
-              required
-            />
+            <h1 className="text-4xl font-black text-gray-700 dark:text-gray-100 uppercase tracking-tighter">Inventaire</h1>
+            <p className="text-gray-500 font-medium">Gestion des stocks et des produits</p>
+          </div>
+          {user.role === 'manager' && (
+            <button
+              onClick={() => { setEditingProduct(null); setFormData({ name: '', CategoryId: '', quantity: 0, price: 0, ZoneId: '', expirationDate: '', volume_unitaire: 0 }); setIsModalOpen(true); }}
+              className={`${nmFlat} ${nmButton} px-8 py-4 rounded-2xl text-indigo-600 font-black flex items-center gap-2`}
+            >
+              <FiPlus /> Ajouter Stock
+            </button>
+          )}
+        </div>
+
+        <div className="flex flex-wrap gap-4 items-center">
+          <div className={`${nmInset} px-4 py-2 rounded-xl flex items-center gap-3`}>
+            <FiFilter className="text-gray-400" />
+            <select 
+              value={filters.categoryId} 
+              onChange={e => setFilters({...filters, categoryId: e.target.value})}
+              className="bg-transparent outline-none text-sm font-bold text-gray-600"
+            >
+              <option value="">Toutes les catégories</option>
+              {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-bold uppercase text-gray-500 dark:text-gray-400 mb-2 ml-1">Catégorie</label>
-              <select
-                value={formData.category}
-                onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                className={`${nmInset} w-full p-3 rounded-xl outline-none bg-transparent text-gray-700 dark:text-gray-200`}
+          {user.role === 'admin' && (
+            <div className={`${nmInset} px-4 py-2 rounded-xl flex items-center gap-3`}>
+              <FiUser className="text-gray-400" />
+              <select 
+                value={filters.managerId} 
+                onChange={e => setFilters({...filters, managerId: e.target.value})}
+                className="bg-transparent outline-none text-sm font-bold text-gray-600"
               >
-                <option value="Food" className="dark:bg-[#1a1d23]">Alimentation</option>
-                <option value="Electronics" className="dark:bg-[#1a1d23]">Électronique</option>
-                <option value="Cosmetics" className="dark:bg-[#1a1d23]">Cosmétiques</option>
-                <option value="Other" className="dark:bg-[#1a1d23]">Autre</option>
+                <option value="">Tous les Managers</option>
+                {managers.map(m => <option key={m.id} value={m.id}>{m.username}</option>)}
               </select>
-            </div>
-            <div>
-              <label className="block text-xs font-bold uppercase text-gray-500 dark:text-gray-400 mb-2 ml-1">Zone</label>
-              <select
-                value={formData.ZoneId}
-                onChange={(e) => setFormData({ ...formData, ZoneId: e.target.value })}
-                className={`${nmInset} w-full p-3 rounded-xl outline-none bg-transparent text-gray-700 dark:text-gray-200`}
-              >
-                <option value="" className="dark:bg-[#1a1d23]">Sélectionner...</option>
-                {availableZones.map(zone => (
-                  <option key={zone.id} value={zone.id} className="dark:bg-[#1a1d23]">{zone.name}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-bold uppercase text-gray-500 dark:text-gray-400 mb-2 ml-1">Prix (€)</label>
-              <input
-                type="number" step="0.01"
-                value={formData.price}
-                onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-                className={`${nmInset} w-full p-3 rounded-xl outline-none text-gray-700 dark:text-gray-200`}
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-bold uppercase text-gray-500 dark:text-gray-400 mb-2 ml-1">Quantité</label>
-              <input
-                type="number"
-                value={formData.quantity}
-                onChange={(e) => setFormData({ ...formData, quantity: e.target.value })}
-                className={`${nmInset} w-full p-3 rounded-xl outline-none text-gray-700 dark:text-gray-200`}
-                required
-              />
-            </div>
-          </div>
-
-          {formData.category === 'Food' && (
-            <div>
-              <label className="block text-xs font-bold uppercase text-gray-500 dark:text-gray-400 mb-2 ml-1">Date d'Expiration</label>
-              <input
-                type="date"
-                value={formData.expirationDate}
-                onChange={(e) => setFormData({ ...formData, expirationDate: e.target.value })}
-                className={`${nmInset} w-full p-3 rounded-xl outline-none text-gray-700 dark:text-gray-200`}
-              />
             </div>
           )}
+        </div>
+      </div>
 
-          <div className="flex justify-end gap-4 pt-6">
-            <button
-              type="button"
-              onClick={() => setIsModalOpen(false)}
-              className={`${nmFlat} ${nmButton} px-6 py-2 rounded-xl text-gray-500 dark:text-gray-400 font-bold`}
+      {/* Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+        <AnimatePresence>
+          {products.map((product) => (
+            <motion.div
+              key={product.id}
+              layout
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className={`${nmFlat} p-6 rounded-[2.5rem] relative group`}
             >
-              Annuler
-            </button>
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className={`${nmFlat} ${nmButton} px-8 py-2 rounded-xl text-blue-600 dark:text-blue-400 font-bold disabled:opacity-50`}
+              <div className="flex justify-between items-start mb-4">
+                <div className={`${nmInset} p-3 rounded-2xl text-indigo-600`}>
+                  <FiBox size={24} />
+                </div>
+                <div className="flex gap-2">
+                  {user.role === 'manager' && (
+                    <>
+                      <button onClick={() => { setEditingProduct(product); setFormData(product); setIsModalOpen(true); }} className="text-blue-500"><FiEdit2 /></button>
+                      <button onClick={async () => { if(window.confirm('Supprimer?')) { await api.delete(`/products/${product.id}`); fetchData(); } }} className="text-red-400"><FiTrash2 /></button>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              <h3 className="text-xl font-black text-gray-700 dark:text-gray-100 mb-1">{product.name}</h3>
+              <div className="flex items-center gap-2 mb-4">
+                <span className="text-[10px] font-black uppercase text-blue-600 bg-blue-50 dark:bg-blue-900/20 px-2 py-1 rounded-md">
+                  {product.Category?.name || 'Sans Catégorie'}
+                </span>
+                <span className="text-[10px] font-black uppercase text-gray-400 px-2 py-1 rounded-md border border-gray-200 dark:border-gray-800">
+                  {product.unit || 'pcs'}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4 mt-6">
+                <div className={`${nmInset} p-3 rounded-2xl`}>
+                  <p className="text-[9px] font-black text-gray-400 uppercase">Stock Actuel</p>
+                  <p className={`text-lg font-black ${product.quantity <= 10 ? 'text-red-500' : 'text-gray-700 dark:text-gray-200'}`}>
+                    {product.quantity}
+                  </p>
+                </div>
+                <div className={`${nmInset} p-3 rounded-2xl`}>
+                  <p className="text-[9px] font-black text-gray-400 uppercase">Localisation</p>
+                  <p className="text-sm font-bold text-gray-600 dark:text-gray-400 truncate">
+                    {product.Zone?.name || 'Non Assigné'}
+                  </p>
+                </div>
+              </div>
+
+              {user.role === 'admin' && product.manager && (
+                <div className="mt-4 pt-4 border-t border-gray-200/50 dark:border-gray-800/50 flex items-center gap-2">
+                  <FiUser className="text-gray-400" size={12} />
+                  <span className="text-[10px] font-bold text-gray-500">Géré par: {product.manager.username}</span>
+                </div>
+              )}
+            </motion.div>
+          ))}
+        </AnimatePresence>
+      </div>
+
+      {/* Modal Produit */}
+      <AnimatePresence>
+        {isModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/20 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, y: 100 }}
+              animate={{ opacity: 1, y: 0 }}
+              className={`${nmFlat} w-full max-w-2xl rounded-[3rem] p-10 relative`}
             >
-              {isSubmitting ? '...' : (editingProduct ? 'Modifier' : 'Ajouter')}
-            </button>
+              <h2 className="text-2xl font-black text-gray-700 dark:text-gray-100 mb-8 uppercase tracking-tighter">
+                {editingProduct ? 'Modifier Stock' : 'Nouveau Stock'}
+              </h2>
+
+              <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="md:col-span-2">
+                  <label className="block text-xs font-black text-gray-400 uppercase mb-2 ml-2">Catégorie</label>
+                  <select
+                    value={formData.CategoryId}
+                    onChange={(e) => setFormData({...formData, CategoryId: e.target.value, name: ''})}
+                    className={`${nmInset} w-full px-6 py-4 rounded-2xl outline-none`}
+                    required
+                  >
+                    <option value="">Sélectionner une catégorie</option>
+                    {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  </select>
+                </div>
+
+                <div className="md:col-span-2">
+                  <label className="block text-xs font-black text-gray-400 uppercase mb-2 ml-2">Produit (Modèle autorisé)</label>
+                  <select
+                    value={formData.name}
+                    onChange={(e) => setFormData({...formData, name: e.target.value})}
+                    className={`${nmInset} w-full px-6 py-4 rounded-2xl outline-none`}
+                    required
+                    disabled={!formData.CategoryId}
+                  >
+                    <option value="">Sélectionner un produit</option>
+                    {availableTemplates.map((p, i) => <option key={i} value={p.name}>{p.name} ({p.unit})</option>)}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-black text-gray-400 uppercase mb-2 ml-2">Quantité Initiale</label>
+                  <input
+                    type="number"
+                    value={formData.quantity}
+                    onChange={(e) => setFormData({...formData, quantity: e.target.value})}
+                    className={`${nmInset} w-full px-6 py-4 rounded-2xl outline-none`}
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-black text-gray-400 uppercase mb-2 ml-2">Prix Unitaire</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={formData.price}
+                    onChange={(e) => setFormData({...formData, price: e.target.value})}
+                    className={`${nmInset} w-full px-6 py-4 rounded-2xl outline-none`}
+                  />
+                </div>
+
+                <div className="md:col-span-2 flex gap-4 mt-6">
+                  <button type="submit" className={`${nmFlat} ${nmButton} flex-1 py-4 rounded-2xl text-indigo-600 font-black uppercase tracking-widest`}>
+                    {editingProduct ? 'Mettre à jour' : 'Ajouter au Stock'}
+                  </button>
+                  <button type="button" onClick={() => setIsModalOpen(false)} className={`${nmFlat} ${nmButton} px-8 py-4 rounded-2xl text-gray-400 font-bold uppercase`}>
+                    Annuler
+                  </button>
+                </div>
+              </form>
+            </motion.div>
           </div>
-        </form>
-      </Modal>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

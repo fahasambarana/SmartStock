@@ -1,5 +1,14 @@
 const sequelize = require("./config/database");
-const { Product, Zone, User, Movement } = require("./models/associations");
+const { Product, Zone, User, Movement, Category, ZoneType } = require("./models/associations");
+
+const BASE_ZONE_TYPES = [
+  { name: 'Étagère', description: 'Zone de stockage en étagères', capacite_max_default: 500, unite_capacite: 'Unités' },
+  { name: 'Palette', description: 'Zone de stockage pour palettes', capacite_max_default: 1000, unite_capacite: 'Unités' },
+  { name: 'Chambre Froide', description: 'Zone réfrigérée', capacite_max_default: 800, unite_capacite: 'Volume' },
+  { name: 'Rack', description: 'Zone de stockage sur racks', capacite_max_default: 1500, unite_capacite: 'Unités' },
+  { name: 'Zone de Quai', description: 'Zone de chargement/déchargement', capacite_max_default: 2000, unite_capacite: 'Unités' },
+  { name: 'Armoire', description: 'Zone de stockage en armoires', capacite_max_default: 300, unite_capacite: 'Unités' },
+];
 
 const BASE_ZONES = [
   /* ... ton tableau BASE_ZONES inchangé ... */
@@ -10,6 +19,11 @@ const BASE_PRODUCTS = [
 const BASE_MOVEMENTS = [
   /* ... ton tableau BASE_MOVEMENTS inchangé ... */
 ];
+const BASE_CATEGORIES = [
+  { name: 'Aliments', description: 'Produits alimentaires' },
+  { name: 'Électronique', description: 'Produits électroniques' },
+  { name: 'Vêtements', description: 'Vêtements et accessoires' },
+];
 
 const getMovementImpact = (product, zone, quantityMoved) => {
   if (!zone) return 0;
@@ -19,6 +33,16 @@ const getMovementImpact = (product, zone, quantityMoved) => {
 };
 
 // ==================== SEEDS ====================
+
+async function seedZoneTypes() {
+  const existing = await ZoneType.count();
+  if (existing > 0) {
+    console.log(`✓ ${existing} types de zones existants`);
+    return;
+  }
+  await ZoneType.bulkCreate(BASE_ZONE_TYPES);
+  console.log(`✓ ${BASE_ZONE_TYPES.length} types de zones créés`);
+}
 
 async function seedZones() {
   const existing = await Zone.count();
@@ -75,23 +99,39 @@ async function seedMovements() {
   console.log(`✓ Mouvements créés`);
 }
 
+async function seedCategories() {
+  const existing = await Category.count();
+  if (existing > 0) {
+    console.log(`✓ ${existing} categories existantes`);
+    return;
+  }
+  await Category.bulkCreate(BASE_CATEGORIES);
+  console.log(`✓ ${BASE_CATEGORIES.length} categories créées`);
+}
+
 // ==================== INITIALISATION ====================
 
 async function initializeDatabase() {
   console.log("Initialisation de la base...");
 
   try {
-    // Force la recréation pour résoudre les problèmes de clés étrangères
-    console.log("🗑️ Recréation des tables...");
-    await sequelize.sync({ force: true });
-
-    console.log("✅ Tables recréées avec succès");
+    await sequelize.sync();
+    console.log("✅ Synchronisation des tables terminée");
   } catch (error) {
-    console.error("❌ Erreur lors de la création des tables :", error.message);
-    throw error;
+    if (
+      error.name === "SequelizeDatabaseError" &&
+      error.parent?.sqlMessage?.includes("Can't DROP FOREIGN KEY")
+    ) {
+      console.warn("⚠️ Erreur de clé étrangère (normale), on continue...");
+    } else {
+      console.error("❌ Erreur critique :", error.message);
+      throw error;
+    }
   }
 
+  await seedZoneTypes();
   await seedZones();
+  await seedCategories();
   await seedProducts();
   await seedMovements();
 

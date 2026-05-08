@@ -1,4 +1,5 @@
 const express = require('express');
+const { protect } = require('../middleware/authMiddleware');
 const { 
   createProduct, 
   getAllProducts, 
@@ -8,6 +9,8 @@ const {
 } = require('../controllers/productController');
 
 const router = express.Router();
+
+router.use(protect);
 
 router.post('/', createProduct);
 router.get('/', getAllProducts);

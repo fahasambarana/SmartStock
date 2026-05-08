@@ -6,7 +6,7 @@ const { Product, Zone } = require('./models/associations');
 async function syncDB() {
   try {
     console.log('Syncing database...');
-    await sequelize.sync({ alter: true });
+    await sequelize.sync();
     console.log('Sync complete.');
   } catch(error) {
     console.error('Error syncing:', error);

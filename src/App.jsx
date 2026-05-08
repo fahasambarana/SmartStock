@@ -5,6 +5,7 @@ import Home from './pages/Home';
 import Dashboard from './pages/Dashboard';
 import Products from './pages/Products';
 import Zones from './pages/Zones';
+import ZoneTypes from './pages/ZoneTypes';
 import Movements from './pages/Movements';
 import Alerts from './pages/Alerts';
 import Users from './pages/Users';
@@ -12,6 +13,8 @@ import DashboardLayout from './layouts/DashboardLayout';
 import ProtectedRoute from './components/ProtectedRoute';
 import InventoryCalendar from './components/InventoryCalendar';
 import Reports from './pages/Reports';
+import Categories from './pages/Categories';
+import PendingUsers from './pages/PendingUsers';
 
 function App() {
   return (
@@ -38,11 +41,35 @@ function App() {
             </DashboardLayout>
           </ProtectedRoute>
         } />
+
+        <Route path="/zone-types" element={
+          <ProtectedRoute allowedRoles={['admin']}>
+            <DashboardLayout>
+              <ZoneTypes />
+            </DashboardLayout>
+          </ProtectedRoute>
+        } />
         
         <Route path="/products" element={
           <ProtectedRoute allowedRoles={['admin', 'manager', 'utilisateur']}>
             <DashboardLayout>
               <Products />
+            </DashboardLayout>
+          </ProtectedRoute>
+        } />
+
+        <Route path="/categories" element={
+          <ProtectedRoute allowedRoles={['admin']}>
+            <DashboardLayout>
+              <Categories />
+            </DashboardLayout>
+          </ProtectedRoute>
+        } />
+
+        <Route path="/pending-users" element={
+          <ProtectedRoute allowedRoles={['admin']}>
+            <DashboardLayout>
+              <PendingUsers />
             </DashboardLayout>
           </ProtectedRoute>
         } />
@@ -71,7 +98,6 @@ function App() {
           </ProtectedRoute>
         } />
         
-        {/* ⚠️ CORRECTION ICI : Ajouter DashboardLayout et ProtectedRoute */}
         <Route path="/inventory-calendar" element={
           <ProtectedRoute allowedRoles={['admin', 'manager']}>
             <DashboardLayout>

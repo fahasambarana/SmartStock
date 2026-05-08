@@ -5,7 +5,7 @@ const bcrypt = require('bcryptjs');
 exports.getAllUsers = async (req, res) => {
   try {
     const users = await User.findAll({
-      attributes: ['id', 'username', 'email', 'role', 'createdAt', 'updatedAt'],
+      attributes: ['id', 'username', 'email', 'role', 'createdAt', 'updatedAt', 'status'],
       order: [['createdAt', 'DESC']]
     });
     
@@ -29,7 +29,7 @@ exports.getUserById = async (req, res) => {
     const { id } = req.params;
     
     const user = await User.findByPk(id, {
-      attributes: ['id', 'username', 'email', 'role', 'createdAt', 'updatedAt']
+      attributes: ['id', 'username', 'email', 'role', 'createdAt', 'updatedAt', 'status']
     });
     
     if (!user) {
@@ -91,7 +91,8 @@ exports.createUser = async (req, res) => {
       username,
       email,
       password: hashedPassword,
-      role: role || 'utilisateur'
+      role: role || 'utilisateur',
+      status: 'approved' // Created by admin = auto approved
     });
     
     // Retourner l'utilisateur sans le mot de passe
@@ -103,6 +104,7 @@ exports.createUser = async (req, res) => {
         username: user.username,
         email: user.email,
         role: user.role,
+        status: user.status,
         createdAt: user.createdAt,
         updatedAt: user.updatedAt
       }
@@ -129,7 +131,7 @@ exports.createUser = async (req, res) => {
 exports.updateUser = async (req, res) => {
   try {
     const { id } = req.params;
-    const { username, email, password, role } = req.body;
+    const { username, email, password, role, status } = req.body;
     
     // Vérifier si l'utilisateur existe
     const user = await User.findByPk(id);
@@ -166,6 +168,7 @@ exports.updateUser = async (req, res) => {
     if (username) user.username = username;
     if (email) user.email = email;
     if (role) user.role = role;
+    if (status) user.status = status;
     if (password) {
       user.password = await bcrypt.hash(password, 10);
     }
@@ -180,6 +183,7 @@ exports.updateUser = async (req, res) => {
         username: user.username,
         email: user.email,
         role: user.role,
+        status: user.status,
         createdAt: user.createdAt,
         updatedAt: user.updatedAt
       }
@@ -228,5 +232,48 @@ exports.deleteUser = async (req, res) => {
       success: false,
       error: 'Erreur lors de la suppression de l\'utilisateur' 
     });
+  }
+};
+
+// Approver un utilisateur
+exports.approveUser = async (req, res) => {
+  try {
+    const user = await User.findByPk(req.params.id);
+    if (!user) return res.status(404).json({ success: false, error: 'Utilisateur non trouvé' });
+    
+    user.status = 'approved';
+    await user.save();
+    
+    res.status(200).json({ success: true, message: 'Utilisateur approuvé avec succès' });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+// Refuser un utilisateur
+exports.rejectUser = async (req, res) => {
+  try {
+    const user = await User.findByPk(req.params.id);
+    if (!user) return res.status(404).json({ success: false, error: 'Utilisateur non trouvé' });
+    
+    user.status = 'rejected';
+    await user.save();
+    
+    res.status(200).json({ success: true, message: 'Utilisateur refusé' });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+// Récupérer les utilisateurs en attente
+exports.getPendingUsers = async (req, res) => {
+  try {
+    const users = await User.findAll({
+      where: { status: 'pending' },
+      attributes: ['id', 'username', 'email', 'role', 'createdAt']
+    });
+    res.status(200).json({ success: true, data: users });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
   }
 };

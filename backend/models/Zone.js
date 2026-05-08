@@ -34,6 +34,16 @@ const Zone = sequelize.define('Zone', {
     type: DataTypes.STRING,
     allowNull: true,
   },
+  ZoneTypeId: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    references: {
+      model: 'zone_types',
+      key: 'id',
+      onDelete: 'SET NULL',
+      onUpdate: 'CASCADE'
+    }
+  },
   unite_capacite: {
     type: DataTypes.ENUM('Volume', 'Unités', 'Poids', 'Surface'),
     allowNull: false,

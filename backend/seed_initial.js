@@ -5,7 +5,7 @@ const Zone = require('./models/Zone');
 async function seedData() {
   try {
     // Sync database
-    await sequelize.sync({ alter: true });
+    await sequelize.sync();
 
     console.log('Initialisation des données de test...');
 

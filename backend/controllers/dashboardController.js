@@ -1,287 +1,267 @@
-// controllers/dashboardController.js
-const { Product, Zone, Movement } = require("../models/associations");
+const { Product, Zone, Movement, Category, User } = require("../models/associations");
 const { Sequelize } = require("sequelize");
 const aiAlertService = require("../services/aiAlertService");
 
-// Obtenir les KPIs du dashboard
-exports.getKPIs = async (req, res) => {
+const DEFAULT_KPIS = {
+  totalProducts: 0,
+  totalZones: 0,
+  totalMovements: 0,
+  totalManagers: 0,
+  totalCategories: 0,
+  lowStock: 0,
+  occupation: "0%",
+};
+
+const DEFAULT_MOVEMENT_CHART = {
+  labels: ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Jun'],
+  in: [0, 0, 0, 0, 0, 0],
+  out: [0, 0, 0, 0, 0, 0],
+};
+
+const DEFAULT_ZONE_CHART = {
+  labels: [],
+  data: [],
+  details: [],
+};
+
+const safeDashboardSection = async (label, fallback, task) => {
   try {
-    const totalProducts = await Product.count();
-    
-    const lowStockProducts = await Product.count({
-      where: {
-        quantity: { [Sequelize.Op.lte]: 10 }
-      }
-    });
-    
-    const perishableProducts = await Product.count({
-      where: {
-        category: 'Food',
-        expirationDate: {
-          [Sequelize.Op.not]: null,
-          [Sequelize.Op.lte]: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
-        }
-      }
-    });
-    
-    const zones = await Zone.findAll();
-    let totalCapacityPercent = 0;
-    zones.forEach(zone => {
-      if (zone.capacite_max > 0) {
-        totalCapacityPercent += (zone.capacite_actuelle / zone.capacite_max) * 100;
-      }
-    });
-    const avgOccupation = zones.length > 0 ? (totalCapacityPercent / zones.length).toFixed(0) : 0;
-    
-    // Alertes actives
-    const activeAlerts = await this.getActiveAlertsCount();
-    
-    res.json({
-      success: true,
-      kpis: {
-        totalProducts,
-        lowStock: lowStockProducts,
-        perishable: perishableProducts,
-        occupation: `${avgOccupation}%`,
-        activeAlerts
-      }
-    });
+    return await task();
   } catch (error) {
-    console.error("Erreur getKPIs:", error);
-    res.status(500).json({ success: false, error: error.message });
+    console.error(`Erreur section dashboard ${label}:`, error.message);
+    return fallback;
   }
 };
 
-// Données pour le graphique des mouvements (12 derniers mois)
-exports.getMovementChartData = async (req, res) => {
+const safeDashboardValue = async (label, fallback, task) => {
   try {
-    const months = [];
-    const inData = [];
-    const outData = [];
-    
-    // Derniers 6 mois
-    for (let i = 5; i >= 0; i--) {
-      const date = new Date();
-      date.setMonth(date.getMonth() - i);
-      const monthName = date.toLocaleString('fr-FR', { month: 'short' });
-      months.push(monthName);
-      
-      const startDate = new Date(date.getFullYear(), date.getMonth(), 1);
-      const endDate = new Date(date.getFullYear(), date.getMonth() + 1, 0);
-      
-      const inMovements = await Movement.sum('quantity', {
-        where: {
-          type: 'in',
-          movementDate: { [Sequelize.Op.between]: [startDate, endDate] }
-        }
-      }) || 0;
-      
-      const outMovements = await Movement.sum('quantity', {
-        where: {
-          type: 'out',
-          movementDate: { [Sequelize.Op.between]: [startDate, endDate] }
-        }
-      }) || 0;
-      
-      inData.push(inMovements);
-      outData.push(outMovements);
-    }
-    
-    res.json({
-      success: true,
-      chartData: {
-        labels: months,
-        datasets: [
-          { label: 'Entrées', data: inData, backgroundColor: '#3b82f6' },
-          { label: 'Sorties', data: outData, backgroundColor: '#f43f5e' }
-        ]
-      }
-    });
+    const value = await task();
+    return value ?? fallback;
   } catch (error) {
-    console.error("Erreur getMovementChartData:", error);
-    res.status(500).json({ success: false, error: error.message });
+    console.error(`Erreur valeur dashboard ${label}:`, error.message);
+    return fallback;
   }
 };
 
-// Données pour le graphique des zones
-exports.getZoneChartData = async (req, res) => {
-  try {
-    const zones = await Zone.findAll();
-    
-    const labels = zones.map(z => z.name);
-    const data = zones.map(z => {
-      if (z.capacite_max > 0) {
-        return (z.capacite_actuelle / z.capacite_max) * 100;
-      }
-      return 0;
-    });
-    
-    const colors = ['#f43f5e', '#3b82f6', '#fbbf24', '#10b981', '#8b5cf6', '#ec4899'];
-    
-    res.json({
-      success: true,
-      chartData: {
-        labels,
-        datasets: [{
-          data,
-          backgroundColor: colors.slice(0, zones.length),
-          borderWidth: 0
-        }]
-      }
-    });
-  } catch (error) {
-    console.error("Erreur getZoneChartData:", error);
-    res.status(500).json({ success: false, error: error.message });
-  }
-};
+const getRole = (user) => user?.role?.toLowerCase?.() || '';
 
-// Récupérer les alertes récentes (avec IA)
-exports.getRecentAlerts = async (req, res) => {
-  try {
-    const products = await Product.findAll({
-      include: [{ model: Zone, attributes: ['name'] }],
-      limit: 20
-    });
-    
-    const alerts = [];
-    
-    for (const product of products) {
-      const analysis = await aiAlertService.analyzeProductRisk(product);
-      
-      if (analysis.riskScore > 50) {
-        alerts.push({
-          id: product.id,
-          productName: product.name,
-          zone: product.Zone?.name || 'Non assigné',
-          riskScore: analysis.riskScore,
-          alertLevel: analysis.alertLevel,
-          message: analysis.recommendation,
-          currentStock: product.quantity,
-          estimatedDaysLeft: Math.floor(analysis.estimatedDaysLeft),
-          priority: analysis.priority,
-          timestamp: new Date().toISOString()
-        });
-      }
-    }
-    
-    // Trier par priorité et limiter à 5
-    alerts.sort((a, b) => a.priority - b.priority);
-    
-    res.json({
-      success: true,
-      alerts: alerts.slice(0, 5)
-    });
-  } catch (error) {
-    console.error("Erreur getRecentAlerts:", error);
-    res.status(500).json({ success: false, error: error.message });
-  }
-};
+const getProductScope = (user) => (
+  getRole(user) === 'manager' ? { UserId: user.id } : {}
+);
 
-// Dashboard complet
-exports.getFullDashboard = async (req, res) => {
-  try {
-    const [kpis, movementChart, zoneChart, recentAlerts] = await Promise.all([
-      (async () => {
-        const totalProducts = await Product.count();
-        const lowStock = await Product.count({ where: { quantity: { [Sequelize.Op.lte]: 10 } } });
-        const perishable = await Product.count({
-          where: {
-            category: 'Food',
-            expirationDate: { [Sequelize.Op.lte]: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) }
-          }
-        });
-        const zones = await Zone.findAll();
+const getMovementScope = (user) => (
+  getRole(user) === 'manager' ? { userId: user.id } : {}
+);
+
+const buildDashboard = async (user) => {
+  const productScope = getProductScope(user);
+  const movementScope = getMovementScope(user);
+
+  const [kpis, movementChart, zoneChart, recentAlerts] = await Promise.all([
+      safeDashboardSection('kpis', DEFAULT_KPIS, async () => {
+        const [
+          scopedProducts,
+          allProducts,
+          totalZones,
+          totalMovements,
+          totalManagers,
+          totalCategories,
+          scopedLowStock,
+          allLowStock,
+          zones
+        ] = await Promise.all([
+          safeDashboardValue('produits manager', 0, () => Product.count({ where: productScope })),
+          safeDashboardValue('produits total', 0, () => Product.count()),
+          safeDashboardValue('zones total', 0, () => Zone.count()),
+          safeDashboardValue('mouvements total', 0, () => Movement.count({ where: movementScope })),
+          safeDashboardValue('managers total', 0, () => User.count({ where: { role: { [Sequelize.Op.in]: ['manager', 'Manager'] } } })),
+          safeDashboardValue('categories total', 0, () => Category.count()),
+          safeDashboardValue('stock faible manager', 0, () => Product.count({
+            where: {
+              ...productScope,
+              quantity: { [Sequelize.Op.lte]: 10 }
+            }
+          })),
+          safeDashboardValue('stock faible total', 0, () => Product.count({
+            where: { quantity: { [Sequelize.Op.lte]: 10 } }
+          })),
+          safeDashboardValue('zones occupation', [], () => Zone.findAll())
+        ]);
+
+        const isManager = getRole(user) === 'manager';
+        const totalProducts = isManager && scopedProducts > 0 ? scopedProducts : allProducts;
+        const lowStock = isManager && scopedProducts > 0 ? scopedLowStock : allLowStock;
         let totalPercent = 0;
         zones.forEach(z => { if (z.capacite_max > 0) totalPercent += (z.capacite_actuelle / z.capacite_max) * 100; });
         const avgOcc = zones.length > 0 ? totalPercent / zones.length : 0;
-        return { totalProducts, lowStock, perishable, occupation: `${avgOcc.toFixed(0)}%` };
-      })(),
-      
-      (async () => {
-        const months = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Jun'];
+        return {
+          totalProducts,
+          totalZones,
+          totalMovements,
+          totalManagers,
+          totalCategories,
+          lowStock,
+          occupation: `${avgOcc.toFixed(0)}%`
+        };
+      }),
+
+      safeDashboardSection('mouvements', DEFAULT_MOVEMENT_CHART, async () => {
+        const months = [];
         const inData = [], outData = [];
         for (let i = 5; i >= 0; i--) {
           const date = new Date();
           date.setMonth(date.getMonth() - i);
+          months.push(date.toLocaleString('fr-FR', { month: 'short' }));
           const start = new Date(date.getFullYear(), date.getMonth(), 1);
           const end = new Date(date.getFullYear(), date.getMonth() + 1, 0);
-          const inSum = await Movement.sum('quantity', { where: { type: 'in', movementDate: { [Sequelize.Op.between]: [start, end] } } }) || 0;
-          const outSum = await Movement.sum('quantity', { where: { type: 'out', movementDate: { [Sequelize.Op.between]: [start, end] } } }) || 0;
+
+          const inSum = await Movement.sum('quantityMoved', {
+            where: {
+              ...movementScope,
+              type: 'Entrée',
+              movementDate: { [Sequelize.Op.between]: [start, end] }
+            }
+          }) || 0;
+
+          const outSum = await Movement.sum('quantityMoved', {
+            where: {
+              ...movementScope,
+              type: 'Sortie',
+              movementDate: { [Sequelize.Op.between]: [start, end] }
+            }
+          }) || 0;
+
           inData.push(inSum);
           outData.push(outSum);
         }
         return { labels: months, in: inData, out: outData };
-      })(),
-      
-      (async () => {
+      }),
+
+      safeDashboardSection('zones', DEFAULT_ZONE_CHART, async () => {
         const zones = await Zone.findAll();
+        const details = zones.map((zone) => {
+          const max = Number(zone.capacite_max) || 0;
+          const current = Number(zone.capacite_actuelle) || 0;
+          const occupation = max > 0 ? Math.round((current / max) * 100) : 0;
+
+          return {
+            id: zone.id,
+            name: zone.name,
+            type: zone.type || 'Standard',
+            current,
+            max,
+            unit: zone.unite_capacite || 'Unités',
+            occupation
+          };
+        });
+
         return {
-          labels: zones.map(z => z.name),
-          data: zones.map(z => z.capacite_max > 0 ? (z.capacite_actuelle / z.capacite_max) * 100 : 0)
+          labels: details.map(z => z.name),
+          data: details.map(z => z.occupation),
+          details
         };
-      })(),
-      
-      (async () => {
-        const products = await Product.findAll({ include: [{ model: Zone }], limit: 20 });
+      }),
+
+      safeDashboardSection('alertes', [], async () => {
+        const products = await Product.findAll({
+          where: productScope,
+          include: [{ model: Zone }],
+          limit: 20,
+          order: [['quantity', 'ASC']]
+        });
         const alerts = [];
         for (const product of products) {
-          if (product.quantity <= 15 || (product.expirationDate && new Date(product.expirationDate) - new Date() < 7 * 24 * 60 * 60 * 1000)) {
+          if (product.quantity <= 15) {
             const analysis = await aiAlertService.analyzeProductRisk(product);
             alerts.push({
               id: product.id,
               productName: product.name,
               message: analysis.recommendation,
+              currentStock: product.quantity,
+              zone: product.Zone?.name || 'Non assigné',
+              riskScore: analysis.riskScore,
               priority: analysis.priority
             });
           }
         }
-        alerts.sort((a, b) => a.priority - b.priority);
-        return alerts.slice(0, 5);
-      })()
+        alerts.sort((a, b) => b.riskScore - a.riskScore);
+        return alerts.slice(0, 3);
+      })
     ]);
-    
+
+  return {
+    kpis,
+    movementChart: {
+      labels: movementChart.labels,
+      datasets: [
+        { label: 'Entrées', data: movementChart.in, backgroundColor: '#3b82f6' },
+        { label: 'Sorties', data: movementChart.out, backgroundColor: '#f43f5e' }
+      ]
+    },
+    zoneChart: {
+      labels: zoneChart.labels,
+      datasets: [{
+        data: zoneChart.data,
+        backgroundColor: ['#f43f5e', '#3b82f6', '#fbbf24', '#10b981', '#8b5cf6', '#ec4899']
+      }],
+      details: zoneChart.details
+    },
+    recentAlerts,
+    updatedAt: new Date().toISOString()
+  };
+};
+
+exports.getFullDashboard = async (req, res) => {
+  try {
+    const dashboard = await buildDashboard(req.user);
+
     res.json({
       success: true,
-      dashboard: {
-        kpis,
-        movementChart: {
-          labels: movementChart.labels,
-          datasets: [
-            { label: 'Entrées', data: movementChart.in, backgroundColor: '#3b82f6' },
-            { label: 'Sorties', data: movementChart.out, backgroundColor: '#f43f5e' }
-          ]
-        },
-        zoneChart: {
-          labels: zoneChart.labels,
-          datasets: [{
-            data: zoneChart.data,
-            backgroundColor: ['#f43f5e', '#3b82f6', '#fbbf24', '#10b981', '#8b5cf6', '#ec4899']
-          }]
-        },
-        recentAlerts
-      }
+      dashboard
     });
-    
+
   } catch (error) {
-    console.error("Erreur getFullDashboard:", error);
+    console.error("Erreur Dashboard:", error);
     res.status(500).json({ success: false, error: error.message });
   }
 };
 
-// Helper pour compter les alertes actives
-exports.getActiveAlertsCount = async () => {
+exports.getKPIs = async (req, res) => {
   try {
-    const products = await Product.findAll();
-    let count = 0;
-    for (const product of products) {
-      if (product.quantity <= 10) count++;
-      if (product.category === 'Food' && product.expirationDate) {
-        const daysUntilExpiry = Math.ceil((new Date(product.expirationDate) - new Date()) / (1000 * 60 * 60 * 24));
-        if (daysUntilExpiry <= 7 && daysUntilExpiry > 0) count++;
-      }
-    }
-    return count;
+    const dashboard = await buildDashboard(req.user);
+    res.json({ success: true, kpis: dashboard.kpis });
   } catch (error) {
-    return 0;
+    console.error("Erreur KPIs:", error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+exports.getMovementChartData = async (req, res) => {
+  try {
+    const dashboard = await buildDashboard(req.user);
+    res.json({ success: true, movementChart: dashboard.movementChart });
+  } catch (error) {
+    console.error("Erreur movement chart:", error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+exports.getZoneChartData = async (req, res) => {
+  try {
+    const dashboard = await buildDashboard(req.user);
+    res.json({ success: true, zoneChart: dashboard.zoneChart });
+  } catch (error) {
+    console.error("Erreur zone chart:", error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+exports.getRecentAlerts = async (req, res) => {
+  try {
+    const dashboard = await buildDashboard(req.user);
+    res.json({ success: true, recentAlerts: dashboard.recentAlerts });
+  } catch (error) {
+    console.error("Erreur recent alerts:", error);
+    res.status(500).json({ success: false, error: error.message });
   }
 };

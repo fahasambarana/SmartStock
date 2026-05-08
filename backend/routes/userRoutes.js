@@ -11,6 +11,9 @@ router.use(authorize('admin'));
 
 // Routes CRUD
 router.get('/', userController.getAllUsers);
+router.get('/pending', userController.getPendingUsers);
+router.put('/:id/approve', userController.approveUser);
+router.put('/:id/reject', userController.rejectUser);
 router.get('/:id', userController.getUserById);
 router.post('/', userController.createUser);
 router.put('/:id', userController.updateUser);

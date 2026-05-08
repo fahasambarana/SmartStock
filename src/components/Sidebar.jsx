@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FiHome, FiMapPin, FiPackage, FiTruck, FiAlertTriangle, FiUsers, FiSettings, FiMenu, FiX, FiCalendar, FiFileText } from 'react-icons/fi';
+import { FiHome, FiMapPin, FiPackage, FiTruck, FiAlertTriangle, FiUsers, FiSettings, FiMenu, FiX, FiCalendar, FiFileText, FiList, FiUserCheck } from 'react-icons/fi';
 import { useAuth } from '../contexts/AuthContext';
 
 const Sidebar = () => {
@@ -12,13 +12,13 @@ const Sidebar = () => {
   // Menu items avec les nouvelles entrées
   const allMenuItems = [
     { name: 'Tableau de Bord', path: '/dashboard', icon: FiHome, roles: ['admin', 'manager', 'utilisateur', 'fournisseur'] },
+    { name: 'Catégories', path: '/categories', icon: FiList, roles: ['admin'] },
+    { name: 'Approbation', path: '/pending-users', icon: FiUserCheck, roles: ['admin'] },
     { name: 'Zones', path: '/zones', icon: FiMapPin, roles: ['admin', 'manager'] },
     { name: 'Produits', path: '/products', icon: FiPackage, roles: ['admin', 'manager', 'utilisateur'] },
     { name: 'Mouvements', path: '/movements', icon: FiTruck, roles: ['admin', 'manager', 'utilisateur'] },
     { name: 'Alertes', path: '/alerts', icon: FiAlertTriangle, roles: ['admin', 'manager', 'utilisateur', 'fournisseur'] },
-    // NOUVEAU : Calendrier Inventaire (Admin & Manager)
     { name: 'Calendrier Inventaire', path: '/inventory-calendar', icon: FiCalendar, roles: ['admin', 'manager'] },
-    // NOUVEAU : Rapports PDF (Admin & Manager)
     { name: 'Rapports PDF', path: '/reports', icon: FiFileText, roles: ['admin', 'manager'] },
     { name: 'Utilisateurs', path: '/users', icon: FiUsers, roles: ['admin'] },
   ];

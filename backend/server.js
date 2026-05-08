@@ -11,10 +11,14 @@ app.use(cors());
 app.use(express.json());
 
 app.use("/api/auth", require("./routes/auth"));
+app.use("/api/users", require("./routes/userRoutes"));
+app.use("/api/categories", require("./routes/categoryRoutes"));
+app.use("/api/zone-types", require("./routes/zoneTypeRoutes"));
 app.use("/api/zones", require("./routes/zones"));
 app.use("/api/products", require("./routes/products"));
 app.use("/api/movements", require("./routes/movements"));
 app.use("/api/alerts", require("./routes/alerts"));
+app.use("/api/dashboard", require("./routes/dashboardRoutes"));
 
 const PORT = process.env.PORT || 5000;
 

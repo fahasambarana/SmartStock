@@ -42,15 +42,30 @@ export const login = (credentials) => api.post('/auth/login', credentials);
 
 // ==================== UTILISATEURS ====================
 export const getUsers = () => api.get('/users');
+export const getPendingUsers = () => api.get('/users/pending');
+export const approveUser = (id) => api.put(`/users/${id}/approve`);
+export const rejectUser = (id) => api.put(`/users/${id}/reject`);
 export const createUser = (user) => api.post('/users', user);
 export const updateUser = (id, user) => api.put(`/users/${id}`, user);
 export const deleteUser = (id) => api.delete(`/users/${id}`);
+
+// ==================== CATEGORIES ====================
+export const getCategories = () => api.get('/categories');
+export const createCategory = (cat) => api.post('/categories', cat);
+export const updateCategory = (id, cat) => api.put(`/categories/${id}`, cat);
+export const deleteCategory = (id) => api.delete(`/categories/${id}`);
 
 // ==================== ZONES ====================
 export const getZones = () => api.get('/zones');
 export const createZone = (zone) => api.post('/zones', zone);
 export const updateZone = (id, zone) => api.put(`/zones/${id}`, zone);
 export const deleteZone = (id) => api.delete(`/zones/${id}`);
+
+// ==================== TYPES DE ZONES ====================
+export const getZoneTypes = () => api.get('/zone-types');
+export const createZoneType = (zoneType) => api.post('/zone-types', zoneType);
+export const updateZoneType = (id, zoneType) => api.put(`/zone-types/${id}`, zoneType);
+export const deleteZoneType = (id) => api.delete(`/zone-types/${id}`);
 
 // ==================== PRODUITS ====================
 export const getProducts = () => api.get('/products');

@@ -4,7 +4,7 @@ const { Product, Zone, User, Movement } = require('./models/associations');
 async function seedMovements() {
   try {
     // Sync database
-    await sequelize.sync({ alter: true });
+    await sequelize.sync();
 
     console.log('Initialisation des mouvements de stock...');
 
