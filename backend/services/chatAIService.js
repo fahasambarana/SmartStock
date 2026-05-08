@@ -230,7 +230,7 @@ Posez-moi une question ou dites "aide" pour plus d'options !`;
 🏭 **Zones** : ${context.totalZones}
 📊 **Occupation moyenne** : ${avgOccupation.toFixed(0)}%
 
-💰 **Valeur estimée** : ${totalValue.toLocaleString('fr-FR')} €
+💰 **Valeur estimée** : ${totalValue.toLocaleString('fr-FR')} MGA
 
 🔄 **Derniers mouvements** : ${context.recentMovements.length}
 
@@ -352,7 +352,7 @@ Posez-moi une question ou dites "aide" pour plus d'options !`;
         let response = `📦 **${product.name}**\n`;
         response += `• Stock : ${product.quantity} unités\n`;
         response += `• Catégorie : ${product.category}\n`;
-        response += `• Prix : ${product.price} €\n`;
+        response += `• Prix : ${product.price} MGA\n`;
         response += `• Zone : ${product.Zone?.name || 'Non assigné'}\n`;
         if (daysUntilExpiry) {
           response += `• Expiration : dans ${daysUntilExpiry} jours\n`;

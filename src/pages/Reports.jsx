@@ -361,7 +361,7 @@ const Reports = () => {
                       </div>
                       <div>
                         <p className="text-xs text-gray-400">Valeur totale</p>
-                        <p className="text-2xl font-bold">{preview.summary.totalValue?.toLocaleString() || 0} €</p>
+                        <p className="text-2xl font-bold">{preview.summary.totalValue?.toLocaleString() || 0} MGA</p>
                       </div>
                       <div>
                         <p className="text-xs text-gray-400">Anomalies</p>

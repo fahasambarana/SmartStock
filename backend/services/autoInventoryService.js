@@ -31,7 +31,7 @@ class AutoInventoryService {
       
       // Vérifier la date d'expiration
       let expirationStatus = null;
-      if (product.category === 'Food' && product.expirationDate) {
+      if (product.expirationDate) {
         const daysUntilExpiry = Math.ceil((new Date(product.expirationDate) - new Date()) / (1000 * 60 * 60 * 24));
         expirationStatus = {
           date: product.expirationDate,
@@ -44,7 +44,7 @@ class AutoInventoryService {
       const inventoryItem = {
         productId: product.id,
         productName: product.name,
-        category: product.category,
+        category: product.category || 'Non catégorisé',
         zone: product.Zone?.name || 'Non assigné',
         currentStock: product.quantity,
         theoreticalStock: theoreticalStock,
@@ -94,7 +94,8 @@ class AutoInventoryService {
       expiringCount: expiringSoonProducts.length,
       lowStockCount: inventoryItems.filter(p => p.currentStock <= 10 && p.currentStock > 0).length,
       totalProducts: inventoryItems.length,
-      totalValue: totalValue
+      totalValue: totalValue,
+      accuracyRate: parseFloat(accuracyRate)
     });
     
     return {
@@ -112,7 +113,7 @@ class AutoInventoryService {
         expiringProducts: expiringSoonProducts.length,
         lowStockProducts: inventoryItems.filter(p => p.currentStock <= 10 && p.currentStock > 0).length,
         zeroStockProducts: inventoryItems.filter(p => p.currentStock === 0).length,
-        accuracyRate: accuracyRate,
+        accuracyRate: parseFloat(accuracyRate),
         healthScore: this.calculateHealthScore(anomalies, expiredProducts, inventoryItems)
       },
       inventory: inventoryItems,
@@ -125,20 +126,26 @@ class AutoInventoryService {
   
   /**
    * Calcule le stock théorique basé sur l'historique COMPLET des mouvements
+   * CORRECTION: utilise quantityMoved au lieu de quantity
    */
   async calculateTheoreticalStock(productId) {
     const movements = await Movement.findAll({
       where: { productId: productId },
-      attributes: ['type', 'quantity']
+      attributes: ['type', 'quantityMoved']
     });
     
     let calculatedStock = 0;
     for (const movement of movements) {
-      if (movement.type === 'in') {
-        calculatedStock += movement.quantity;
-      } else if (movement.type === 'out') {
-        calculatedStock -= movement.quantity;
+      const type = movement.type;
+      const qty = movement.quantityMoved;
+      
+      // Gérer les différents formats de type (français/anglais)
+      if (type === 'in' || type === 'Entrée' || type === 'entree') {
+        calculatedStock += qty;
+      } else if (type === 'out' || type === 'Sortie' || type === 'sortie') {
+        calculatedStock -= qty;
       }
+      // Les transferts n'affectent pas le stock total
     }
     return Math.max(0, calculatedStock);
   }
@@ -187,6 +194,10 @@ class AutoInventoryService {
     // Pénalité pour stock bas
     const lowStockCount = inventoryItems.filter(p => p.currentStock <= 5).length;
     score -= lowStockCount * 3;
+    
+    // Pénalité pour stock zéro
+    const zeroStockCount = inventoryItems.filter(p => p.currentStock === 0).length;
+    score -= zeroStockCount * 2;
     
     return Math.max(0, Math.min(100, score));
   }

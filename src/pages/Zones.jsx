@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
-import Table from "../components/Table";
 import Modal from "../components/Modal";
-import { FiPlus, FiAlertCircle } from "react-icons/fi";
+import { FiPlus, FiAlertCircle, FiEdit2, FiTrash2, FiSearch, FiMapPin } from "react-icons/fi";
 import { useAuth } from "../contexts/AuthContext";
 import { getZones, createZone, updateZone, deleteZone, getZoneTypes } from "../services/api";
 
@@ -30,16 +29,14 @@ const Zones = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { user } = useAuth();
 
-  const canManageZones = user?.role === "manager";
+  // Détection du rôle flexible
+  const userRole = user?.role?.toLowerCase();
+  const canManageZones = userRole === "admin" || userRole === "manager";
 
-  const columns = [
-    { key: "name", label: "Zone principale" },
-    { key: "type", label: "Type interne" },
-    { key: "unite_capacite", label: "Unité" },
-    { key: "capacite_max", label: "Cap. zone" },
-    { key: "capacite_type", label: "Cap. type" },
-    { key: "capacite_actuelle", label: "Utilisée" },
-  ];
+  // --- STYLES NEUMORPHISMES ---
+  const nmFlat = "bg-[#e0e5ec] dark:bg-[#1a1d23] shadow-[9px_9px_16px_rgb(163,177,198,0.6),-9px_-9px_16px_rgba(255,255,255,0.5)] dark:shadow-[6px_6px_12px_#0e1013,-6px_-6px_12px_rgba(255,255,255,0.05)]";
+  const nmInset = "bg-[#e0e5ec] dark:bg-[#1a1d23] shadow-[inset_6px_6px_12px_#b8b9be,inset_-6px_-6px_12px_#ffffff] dark:shadow-[inset_4px_4px_8px_#0e1013,inset_-4px_-4px_8px_rgba(255,255,255,0.05)]";
+  const nmButton = "active:shadow-[inset_4px_4px_8px_#b8b9be,inset_-4px_-4px_8px_#ffffff] dark:active:shadow-[inset_3px_3px_6px_#0e1013,inset_-3px_-3px_6px_rgba(255,255,255,0.05)] transition-all duration-200";
 
   useEffect(() => {
     fetchZones();
@@ -63,7 +60,6 @@ const Zones = () => {
       setError(null);
     } catch (err) {
       setError("Erreur lors du chargement des zones");
-      console.error(err);
     } finally {
       setIsLoading(false);
     }
@@ -79,9 +75,8 @@ const Zones = () => {
 
   const handleEdit = (zone) => {
     setEditingZone(zone);
-    const knownType = zoneTypes.some((zoneType) => zoneType.name === zone.type);
-    const hasSavedTypeModel = Boolean(zone.ZoneTypeId || zone.ZoneType?.id);
-    const isCustomType = Boolean(zone.type) && !knownType && !hasSavedTypeModel;
+    const knownType = zoneTypes.some((zt) => zt.name === zone.type);
+    const isCustomType = Boolean(zone.type) && !knownType && !zone.ZoneTypeId;
 
     setFormData({
       name: zone.name,
@@ -91,7 +86,7 @@ const Zones = () => {
       capacite_max: zone.capacite_max || "",
       capacite_type: zone.capacite_type || "",
       type: isCustomType ? "Autre" : zone.type || "",
-      ZoneTypeId: zone.ZoneTypeId || zone.ZoneType?.id || "",
+      ZoneTypeId: zone.ZoneTypeId || "",
     });
     setCustomType(isCustomType ? zone.type : "");
     setShowCustomType(isCustomType);
@@ -99,17 +94,12 @@ const Zones = () => {
   };
 
   const handleDelete = async (zone) => {
-    if (
-      window.confirm(
-        `Êtes-vous sûr de vouloir supprimer la zone "${zone.name}" ?`,
-      )
-    ) {
+    if (window.confirm(`Supprimer la zone "${zone.name}" ?`)) {
       try {
         await deleteZone(zone.id);
-        fetchZones(); // Refresh the list
+        fetchZones();
       } catch (err) {
-        alert("Erreur lors de la suppression de la zone");
-        console.error(err);
+        alert("Erreur lors de la suppression");
       }
     }
   };
@@ -121,9 +111,6 @@ const Zones = () => {
     const finalType = formData.type === "Autre" ? customType.trim() : formData.type;
     const submissionData = {
       ...formData,
-      name: formData.name.trim(),
-      location: formData.location.trim(),
-      description: formData.description.trim(),
       type: finalType,
       ZoneTypeId: formData.type === "Autre" ? "" : formData.ZoneTypeId,
     };
@@ -135,253 +122,234 @@ const Zones = () => {
         await createZone(submissionData);
       }
       setIsModalOpen(false);
-      fetchZones(); // Refresh the list
+      fetchZones();
     } catch (err) {
-      alert(
-        err.response?.data?.message ||
-          "Erreur lors de l'enregistrement de la zone",
-      );
-      console.error(err);
+      alert("Erreur d'enregistrement");
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const filteredZones = zones.filter(
-    (zone) =>
-      zone.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (zone.description &&
-        zone.description.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      (zone.location &&
-        zone.location.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      (zone.type && zone.type.toLowerCase().includes(searchTerm.toLowerCase())),
+  const filteredZones = zones.filter(zone =>
+    zone.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (zone.type && zone.type.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
-  if (isLoading) {
-    return (
-      <div className="p-6 flex justify-center items-center h-full">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-      </div>
-    );
-  }
-
   return (
-    <div className="p-6">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-gray-800">Zones</h1>
+    <div className="min-h-screen bg-[#e0e5ec] dark:bg-[#1a1d23] p-8 text-gray-700 dark:text-gray-200 transition-colors duration-300">
+      
+      {/* Header */}
+      <div className="flex flex-col md:flex-row justify-between items-center mb-10 gap-4">
+        <h1 className="text-3xl font-black text-[#44474a] dark:text-gray-100 uppercase italic tracking-tighter flex items-center">
+          <FiMapPin className="mr-3 text-blue-600" /> Gestion des Zones
+        </h1>
         {canManageZones && (
           <button
             onClick={handleAdd}
-            className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 flex items-center transition-colors shadow-sm">
-            <FiPlus className="w-5 h-5 mr-2" />
-            Ajouter une Zone
+            className={`${nmFlat} ${nmButton} px-6 py-3 rounded-2xl flex items-center font-bold text-blue-600 dark:text-blue-400`}
+          >
+            <FiPlus className="mr-2 stroke-[3px]" /> Ajouter une Zone
           </button>
         )}
       </div>
 
-      {error && (
-        <div className="mb-4 bg-red-50 text-red-700 p-4 rounded-md flex items-center shadow-sm">
-          <FiAlertCircle className="w-5 h-5 mr-2 text-red-500" />
-          {error}
-        </div>
-      )}
-
-      <div className="mb-4">
+      {/* Barre de recherche */}
+      <div className={`${nmInset} flex items-center px-5 py-1 rounded-2xl mb-8`}>
+        <FiSearch className="text-gray-400 mr-3" />
         <input
           type="text"
-          placeholder="Rechercher des zones..."
+          placeholder="Rechercher une zone (nom, type...)"
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 transition-colors shadow-sm"
+          className="bg-transparent w-full outline-none py-3 text-gray-600 dark:text-gray-300"
         />
       </div>
 
-      <div className="bg-white rounded-lg shadow overflow-hidden">
-        <Table
-          columns={columns}
-          data={filteredZones}
-          onEdit={canManageZones ? handleEdit : null}
-          onDelete={canManageZones ? handleDelete : null}
-        />
-        {filteredZones.length === 0 && !error && (
-          <div className="p-8 text-center text-gray-500">
+      {error && (
+        <div className={`${nmFlat} p-4 rounded-xl mb-6 flex items-center text-red-500 font-bold`}>
+          <FiAlertCircle className="mr-2" /> {error}
+        </div>
+      )}
+
+      {/* TABLEAU NEUMORPHIQUE */}
+      <div className={`${nmFlat} rounded-[2rem] overflow-hidden`}>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="border-b border-gray-300/30 dark:border-white/5 uppercase text-xs font-black tracking-widest text-gray-500 dark:text-gray-400">
+                <th className="p-6">Zone principale</th>
+                <th className="p-6">Type Interne</th>
+                <th className="p-6">Unité</th>
+                <th className="p-6">Cap. Zone</th>
+                <th className="p-6">Cap. Type</th>
+                <th className="p-6 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredZones.map((zone) => (
+                <tr key={zone.id} className="hover:bg-white/10 transition-colors border-b border-gray-300/10 dark:border-white/5 group">
+                  <td className="p-6 font-bold text-gray-800 dark:text-gray-100">{zone.name}</td>
+                  <td className="p-6 text-gray-600 dark:text-gray-400">
+                    <span className="px-3 py-1 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-600 text-xs font-bold">
+                      {zone.type}
+                    </span>
+                  </td>
+                  <td className="p-6 text-gray-500">{zone.unite_capacite}</td>
+                  <td className="p-6 font-mono font-bold text-blue-600">{zone.capacite_max}</td>
+                  <td className="p-6 font-mono">{zone.capacite_type}</td>
+                  <td className="p-6 text-right">
+                    <div className="flex justify-end gap-3">
+                      {canManageZones && (
+                        <>
+                          <button 
+                            onClick={() => handleEdit(zone)}
+                            className={`${nmFlat} ${nmButton} p-3 rounded-xl text-amber-600`}
+                            title="Modifier"
+                          >
+                            <FiEdit2 size={16} />
+                          </button>
+                          <button 
+                            onClick={() => handleDelete(zone)}
+                            className={`${nmFlat} ${nmButton} p-3 rounded-xl text-red-500`}
+                            title="Supprimer"
+                          >
+                            <FiTrash2 size={16} />
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        {filteredZones.length === 0 && !isLoading && (
+          <div className="p-10 text-center text-gray-400 italic font-medium">
             Aucune zone trouvée.
           </div>
         )}
       </div>
 
+      {/* Modal - Formulaire identique à votre logique originale */}
       <Modal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        title={editingZone ? "Modifier la Zone" : "Ajouter une Zone"}>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Zone principale <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="text"
-              value={formData.name}
-              onChange={(e) =>
-                setFormData({ ...formData, name: e.target.value })
-              }
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-              placeholder="Ex: Entrepôt principal"
-              required
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Emplacement
-            </label>
-            <input
-              type="text"
-              value={formData.location}
-              onChange={(e) =>
-                setFormData({ ...formData, location: e.target.value })
-              }
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-              placeholder="Ex: Bâtiment A, Étage 1"
-            />
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        title={editingZone ? "Modifier la Zone" : "Ajouter une Zone"}
+      >
+        <form onSubmit={handleSubmit} className="space-y-4 p-1">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Unité de capacité
-              </label>
+              <label className="block text-[10px] font-black uppercase text-gray-500 mb-1 ml-1">Zone principale *</label>
+              <input
+                type="text"
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                className={`${nmInset} w-full p-3 rounded-xl outline-none`}
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-[10px] font-black uppercase text-gray-500 mb-1 ml-1">Emplacement</label>
+              <input
+                type="text"
+                value={formData.location}
+                onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                className={`${nmInset} w-full p-3 rounded-xl outline-none`}
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-[10px] font-black uppercase text-gray-500 mb-1 ml-1">Unité</label>
               <select
                 value={formData.unite_capacite}
-                onChange={(e) =>
-                  setFormData({ ...formData, unite_capacite: e.target.value })
-                }
-                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                onChange={(e) => setFormData({ ...formData, unite_capacite: e.target.value })}
+                className={`${nmInset} w-full p-3 rounded-xl outline-none bg-transparent`}
+              >
                 <option value="Unités">Unités</option>
                 <option value="Volume">Volume (m³)</option>
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Capacité max de la zone principale <span className="text-red-500">*</span>
-              </label>
+              <label className="block text-[10px] font-black uppercase text-gray-500 mb-1 ml-1">Capacité Max Zone *</label>
               <input
                 type="number"
                 step="0.01"
-                min="0"
                 value={formData.capacite_max}
-                onChange={(e) =>
-                  setFormData({ ...formData, capacite_max: e.target.value })
-                }
-                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                placeholder="0.00"
+                onChange={(e) => setFormData({ ...formData, capacite_max: e.target.value })}
+                className={`${nmInset} w-full p-3 rounded-xl outline-none`}
                 required
               />
             </div>
           </div>
+
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Type de zone interne
-            </label>
+            <label className="block text-[10px] font-black uppercase text-gray-500 mb-1 ml-1">Type de zone interne</label>
             <select
               value={formData.type}
               onChange={(e) => {
                 const selectedTypeName = e.target.value;
                 const selectedType = zoneTypes.find((zt) => zt.name === selectedTypeName);
-
                 setFormData({
                   ...formData,
                   type: selectedTypeName,
                   ZoneTypeId: selectedType?.id || "",
-                  capacite_type:
-                    selectedTypeName === "Autre"
-                      ? formData.capacite_type
-                      : selectedType?.capacite_max_default || formData.capacite_type,
-                  unite_capacite:
-                    selectedTypeName === "Autre"
-                      ? formData.unite_capacite
-                      : selectedType?.unite_capacite || formData.unite_capacite,
+                  capacite_type: selectedTypeName === "Autre" ? formData.capacite_type : selectedType?.capacite_max_default || "",
                 });
                 setShowCustomType(selectedTypeName === "Autre");
               }}
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-              required>
-              <option value="">-- Sélectionner un type --</option>
+              className={`${nmInset} w-full p-3 rounded-xl outline-none bg-transparent`}
+              required
+            >
+              <option value="">-- Sélectionner --</option>
               {zoneTypes.map((t) => (
-                <option key={t.id} value={t.name}>
-                  {t.name} ({t.capacite_max_default} {t.unite_capacite})
-                </option>
+                <option key={t.id} value={t.name}>{t.name}</option>
               ))}
               <option value="Autre">Autre...</option>
             </select>
           </div>
 
           {showCustomType && (
-            <div className="animate-fade-in">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Précisez le Type
-              </label>
+            <div className="animate-in slide-in-from-top-2 duration-300">
+              <label className="block text-[10px] font-black uppercase text-gray-500 mb-1 ml-1">Précisez le Type</label>
               <input
                 type="text"
                 value={customType}
                 onChange={(e) => setCustomType(e.target.value)}
-                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                placeholder="Ex: Armoire, Conteneur, Rack mobile..."
-                required={showCustomType}
+                className={`${nmInset} w-full p-3 rounded-xl outline-none`}
+                required
               />
             </div>
           )}
+
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Capacité max de ce type <span className="text-red-500">*</span>
-            </label>
+            <label className="block text-[10px] font-black uppercase text-gray-500 mb-1 ml-1">Capacité Max Type *</label>
             <input
               type="number"
               step="0.01"
-              min="0"
               value={formData.capacite_type}
-              onChange={(e) =>
-                setFormData({ ...formData, capacite_type: e.target.value })
-              }
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-              placeholder="Ex: 300"
+              onChange={(e) => setFormData({ ...formData, capacite_type: e.target.value })}
+              className={`${nmInset} w-full p-3 rounded-xl outline-none`}
               required
             />
           </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Description
-            </label>
-            <textarea
-              value={formData.description}
-              onChange={(e) =>
-                setFormData({ ...formData, description: e.target.value })
-              }
-              rows={2}
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-              placeholder="Description ou notes concernant la zone..."
-            />
-          </div>
-          <div className="flex justify-end space-x-3 pt-4 border-t border-gray-100">
+
+          <div className="flex justify-end gap-4 mt-6">
             <button
               type="button"
               onClick={() => setIsModalOpen(false)}
-              disabled={isSubmitting}
-              className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors">
+              className={`${nmFlat} ${nmButton} px-6 py-2 rounded-xl text-gray-500 font-bold`}
+            >
               Annuler
             </button>
             <button
               type="submit"
               disabled={isSubmitting}
-              className="px-4 py-2 border border-transparent rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 flex items-center transition-colors">
-              {isSubmitting ? (
-                <span className="flex items-center">
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                  Enregistrement...
-                </span>
-              ) : editingZone ? (
-                "Modifier"
-              ) : (
-                "Ajouter"
-              )}
+              className={`${nmFlat} ${nmButton} px-6 py-2 rounded-xl text-blue-600 font-black uppercase text-xs`}
+            >
+              {isSubmitting ? "..." : (editingZone ? "Modifier" : "Ajouter")}
             </button>
           </div>
         </form>

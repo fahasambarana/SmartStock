@@ -19,6 +19,11 @@ app.use("/api/products", require("./routes/products"));
 app.use("/api/movements", require("./routes/movements"));
 app.use("/api/alerts", require("./routes/alerts"));
 app.use("/api/dashboard", require("./routes/dashboardRoutes"));
+app.use("/api/inventory-calendar", require("./routes/inventoryCalendarRoutes"));
+app.use("/api/ai-alerts", require("./routes/aiAlerts"));
+app.use("/api/chat", require("./routes/chatRoutes"));
+app.use("/api/reports", require("./routes/reportRoutes"));
+
 
 const PORT = process.env.PORT || 5000;
 
