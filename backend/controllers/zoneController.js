@@ -1,5 +1,7 @@
 const Zone = require('../models/Zone');
 const ZoneType = require('../models/ZoneType');
+const Product = require('../models/Product');
+const { Op } = require('sequelize');
 
 const zoneAttributesWithoutTypeModel = Object.keys(Zone.rawAttributes).filter(
   (attribute) => attribute !== 'ZoneTypeId'
@@ -27,6 +29,39 @@ const findZoneWithOptionalType = async (id) => {
   }
 };
 
+const getRole = (user) => user?.role?.toLowerCase?.() || '';
+
+const getZoneScope = async (user) => {
+  if (getRole(user) !== 'manager') return {};
+
+  const products = await Product.findAll({
+    where: { UserId: user.id, ZoneId: { [Op.ne]: null } },
+    attributes: ['ZoneId'],
+    raw: true,
+  });
+  const productZoneIds = [...new Set(products.map((product) => product.ZoneId).filter(Boolean))];
+
+  return {
+    [Op.or]: [
+      { UserId: user.id },
+      ...(productZoneIds.length > 0 ? [{ id: { [Op.in]: productZoneIds } }] : []),
+    ],
+  };
+};
+
+const canAccessZone = async (zone, user) => {
+  if (getRole(user) !== 'manager') return true;
+  if (zone.UserId === user.id) return true;
+
+  return Boolean(await Product.findOne({
+    where: {
+      UserId: user.id,
+      ZoneId: zone.id,
+    },
+    attributes: ['id'],
+  }));
+};
+
 // Create a new zone
 exports.createZone = async (req, res) => {
   try {
@@ -40,7 +75,8 @@ exports.createZone = async (req, res) => {
       unite_capacite: unite_capacite || 'Unités',
       capacite_max: parseFloat(capacite_max) || 0,
       capacite_type: parseFloat(capacite_type) || 0,
-      ZoneTypeId: ZoneTypeId ? parseInt(ZoneTypeId) : null
+      ZoneTypeId: ZoneTypeId ? parseInt(ZoneTypeId) : null,
+      UserId: getRole(req.user) === 'manager' ? req.user.id : null
     };
 
     let zone;
@@ -65,13 +101,17 @@ exports.getAllZones = async (req, res) => {
   try {
     let zones;
     try {
+      const where = await getZoneScope(req.user);
       zones = await Zone.findAll({
+        where,
         include: [{ model: ZoneType, as: 'ZoneType' }],
         order: [['createdAt', 'DESC']]
       });
     } catch (error) {
       if (!isZoneTypeSchemaError(error)) throw error;
+      const where = await getZoneScope(req.user);
       zones = await Zone.findAll({
+        where,
         attributes: zoneAttributesWithoutTypeModel,
         order: [['createdAt', 'DESC']]
       });
@@ -88,6 +128,9 @@ exports.getZoneById = async (req, res) => {
     const zone = await findZoneWithOptionalType(req.params.id);
     if (!zone) {
       return res.status(404).json({ message: 'Zone not found' });
+    }
+    if (!(await canAccessZone(zone, req.user))) {
+      return res.status(403).json({ message: 'Non autorisé' });
     }
     res.json(zone);
   } catch (error) {
@@ -111,6 +154,9 @@ exports.updateZone = async (req, res) => {
     
     if (!zone) {
       return res.status(404).json({ message: 'Zone not found' });
+    }
+    if (getRole(req.user) === 'manager' && zone.UserId !== req.user.id) {
+      return res.status(403).json({ message: 'Non autorisé' });
     }
 
     // Check if updating name and if it conflicts with another zone
@@ -154,6 +200,9 @@ exports.deleteZone = async (req, res) => {
     const zone = await Zone.findByPk(req.params.id);
     if (!zone) {
       return res.status(404).json({ message: 'Zone not found' });
+    }
+    if (getRole(req.user) === 'manager' && zone.UserId !== req.user.id) {
+      return res.status(403).json({ message: 'Non autorisé' });
     }
 
     await zone.destroy();

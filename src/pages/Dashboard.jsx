@@ -85,6 +85,11 @@ const Dashboard = () => {
     ? new Date(data.updatedAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
     : '--:--';
   const currentRole = user?.role?.toLowerCase?.() || '';
+  const sessionLabel = currentRole === 'manager' && user?.username
+    ? `Session manager: ${user.username}`
+    : currentRole === 'admin'
+      ? 'Vue administrateur globale'
+      : 'Vue utilisateur';
 
   const managerKpis = [
     { label: 'Stock faible', value: data?.kpis?.lowStock || 0, icon: FiAlertTriangle, color: 'text-red-500' },
@@ -108,7 +113,7 @@ const Dashboard = () => {
             Tableau de bord
           </h1>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-            Dernière mise à jour: {updatedAt}
+            {sessionLabel} • Dernière mise à jour: {updatedAt}
           </p>
         </div>
         <button
@@ -151,7 +156,7 @@ const Dashboard = () => {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Charts */}
-        <div className={`${nmFlat} lg:col-span-2 p-8 rounded-[3rem]`}>
+        <div className={`${nmFlat} lg:col-span-3 p-8 rounded-[3rem]`}>
           <h3 className="text-xl font-black text-gray-700 dark:text-gray-100 mb-6 uppercase tracking-tighter">Flux de Stock</h3>
           <div className="h-80">
             <Bar
@@ -166,20 +171,7 @@ const Dashboard = () => {
           </div>
         </div>
 
-        <div className={`${nmFlat} p-8 rounded-[3rem]`}>
-          <h3 className="text-xl font-black text-gray-700 dark:text-gray-100 mb-6 uppercase tracking-tighter">Occupation Zones</h3>
-          <div className="h-64">
-            <Doughnut
-              data={zoneChart}
-              options={{
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: { legend: { position: 'bottom' } },
-                cutout: '65%',
-              }}
-            />
-          </div>
-        </div>
+        
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -191,7 +183,7 @@ const Dashboard = () => {
                 <div className="flex items-center justify-between gap-4 mb-3">
                   <div>
                     <p className="font-black text-gray-700 dark:text-gray-100">{zone.name}</p>
-                    <p className="text-xs text-gray-500">{zone.type}</p>
+                    <p className="text-xs text-gray-500">{zone.type} • {zone.location}</p>
                   </div>
                   <span className="text-sm font-black text-indigo-600">{zone.occupation}%</span>
                 </div>
@@ -202,7 +194,7 @@ const Dashboard = () => {
                   />
                 </div>
                 <p className="text-xs text-gray-500 mt-2">
-                  {zone.current} / {zone.max} {zone.unit}
+                  {zone.current} / {zone.max} {zone.unit} • {zone.productCount || 0} produits • stock {zone.totalQuantity || 0}
                 </p>
               </div>
             ))}

@@ -44,8 +44,18 @@ const Zone = sequelize.define('Zone', {
       onUpdate: 'CASCADE'
     }
   },
+  UserId: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    references: {
+      model: 'users',
+      key: 'id',
+      onDelete: 'SET NULL',
+      onUpdate: 'CASCADE'
+    }
+  },
   unite_capacite: {
-    type: DataTypes.ENUM('Volume', 'Unités', 'Poids', 'Surface'),
+    type: DataTypes.ENUM('Volume', 'Unités', 'Pièces', 'Kg', 'Poids', 'Surface'),
     allowNull: false,
     defaultValue: 'Unités',
   },

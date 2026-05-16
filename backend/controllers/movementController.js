@@ -9,6 +9,13 @@ const MOVEMENT_TYPE_MAP = {
   transfer: "Transfert",
 };
 
+const getRole = (user) => user?.role?.toLowerCase?.() || "";
+
+const getMovementScope = (user, extraWhere = {}) => ({
+  ...extraWhere,
+  ...(getRole(user) === "manager" ? { userId: user.id } : {}),
+});
+
 // Create a movement (Entrée, Sortie, or Transfert)
 exports.createMovement = async (req, res) => {
   try {
@@ -32,6 +39,9 @@ exports.createMovement = async (req, res) => {
     const product = await Product.findByPk(productId);
     if (!product) {
       return res.status(404).json({ message: "Produit non trouvé" });
+    }
+    if (getRole(req.user) === "manager" && product.UserId !== req.user.id) {
+      return res.status(403).json({ message: "Non autorisé" });
     }
 
     const quantityBefore = product.quantity;
@@ -250,7 +260,7 @@ exports.getMovementsByType = async (req, res) => {
     }
 
     const movements = await Movement.findAll({
-      where: { type: movementType },
+      where: getMovementScope(req.user, { type: movementType }),
       include: [
         {
           model: Product,
@@ -282,10 +292,10 @@ exports.getMovementsByType = async (req, res) => {
 
 exports.getMovementStats = async (req, res) => {
   try {
-    const total = await Movement.count();
-    const totalIn = await Movement.count({ where: { type: MOVEMENT_TYPE_MAP.in } });
-    const totalOut = await Movement.count({ where: { type: MOVEMENT_TYPE_MAP.out } });
-    const totalTransfer = await Movement.count({ where: { type: MOVEMENT_TYPE_MAP.transfer } });
+    const total = await Movement.count({ where: getMovementScope(req.user) });
+    const totalIn = await Movement.count({ where: getMovementScope(req.user, { type: MOVEMENT_TYPE_MAP.in }) });
+    const totalOut = await Movement.count({ where: getMovementScope(req.user, { type: MOVEMENT_TYPE_MAP.out }) });
+    const totalTransfer = await Movement.count({ where: getMovementScope(req.user, { type: MOVEMENT_TYPE_MAP.transfer }) });
 
     res.json({
       total,
@@ -326,6 +336,7 @@ exports.cancelMovement = async (req, res) => {
 exports.getAllMovements = async (req, res) => {
   try {
     const movements = await Movement.findAll({
+      where: getMovementScope(req.user),
       include: [
         {
           model: Product,
@@ -359,7 +370,7 @@ exports.getAllMovements = async (req, res) => {
 exports.getProductMovements = async (req, res) => {
   try {
     const movements = await Movement.findAll({
-      where: { productId: req.params.productId },
+      where: getMovementScope(req.user, { productId: req.params.productId }),
       include: [
         {
           model: Product,
@@ -393,12 +404,12 @@ exports.getProductMovements = async (req, res) => {
 exports.getZoneMovements = async (req, res) => {
   try {
     const movements = await Movement.findAll({
-      where: {
+      where: getMovementScope(req.user, {
         [Op.or]: [
           { sourceZoneId: req.params.zoneId },
           { destinationZoneId: req.params.zoneId },
         ],
-      },
+      }),
       include: [
         {
           model: Product,
@@ -453,6 +464,9 @@ exports.getMovementById = async (req, res) => {
 
     if (!movement) {
       return res.status(404).json({ message: "Mouvement non trouvé" });
+    }
+    if (getRole(req.user) === "manager" && movement.userId !== req.user.id) {
+      return res.status(403).json({ message: "Non autorisé" });
     }
 
     res.json(movement);

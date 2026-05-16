@@ -50,10 +50,10 @@ const BASE_ZONES = [
 ];
 
 const MANAGER_ZONES = [
-  { name: 'Zone Manager A', description: 'Zone de stockage du manager', location: 'Entrepôt Manager', capacite_max: 700, capacite_actuelle: 0, type: 'standard', unite_capacite: 'Unités' },
-  { name: 'Zone Manager Froide', description: 'Zone froide du manager', location: 'Entrepôt Manager', capacite_max: 250, capacite_actuelle: 0, type: 'froide', unite_capacite: 'Volume' },
-  { name: 'Zone Manager Aliments', description: 'Zone dédiée au manager aliments', location: 'Entrepôt Manager Aliments', capacite_max: 900, capacite_actuelle: 0, type: 'standard', unite_capacite: 'Unités' },
-  { name: 'Zone Manager Electronique', description: 'Zone dédiée au manager électronique', location: 'Entrepôt Manager Electronique', capacite_max: 450, capacite_actuelle: 0, type: 'standard', unite_capacite: 'Unités' },
+  { managerUsername: 'manager', name: 'Zone Manager A', description: 'Zone de stockage du manager', location: 'Entrepôt Manager', capacite_max: 700, capacite_actuelle: 0, type: 'standard', unite_capacite: 'Unités' },
+  { managerUsername: 'manager', name: 'Zone Manager Froide', description: 'Zone froide du manager', location: 'Entrepôt Manager', capacite_max: 250, capacite_actuelle: 0, type: 'froide', unite_capacite: 'Volume' },
+  { managerUsername: 'manager_aliments', name: 'Zone Manager Aliments', description: 'Zone dédiée au manager aliments', location: 'Entrepôt Manager Aliments', capacite_max: 900, capacite_actuelle: 0, type: 'standard', unite_capacite: 'Unités' },
+  { managerUsername: 'manager_electronique', name: 'Zone Manager Electronique', description: 'Zone dédiée au manager électronique', location: 'Entrepôt Manager Electronique', capacite_max: 450, capacite_actuelle: 0, type: 'standard', unite_capacite: 'Unités' },
 ];
 
 const BASE_CATEGORIES = [
@@ -142,8 +142,9 @@ async function seedZoneTypes() {
 
 async function seedZones() {
   let created = 0;
+  let updated = 0;
 
-  for (const zoneSeed of [...BASE_ZONES, ...MANAGER_ZONES]) {
+  for (const zoneSeed of BASE_ZONES) {
     const [, wasCreated] = await Zone.findOrCreate({
       where: { name: zoneSeed.name },
       defaults: zoneSeed,
@@ -151,8 +152,33 @@ async function seedZones() {
     if (wasCreated) created += 1;
   }
 
+  const managers = await User.findAll({ where: { role: 'manager', status: 'approved' } });
+  const managerMap = new Map(managers.map((manager) => [manager.username, manager]));
+
+  for (const zoneSeed of MANAGER_ZONES) {
+    const manager = managerMap.get(zoneSeed.managerUsername);
+    const zoneDefaults = { ...zoneSeed };
+    delete zoneDefaults.managerUsername;
+    const payload = {
+      ...zoneDefaults,
+      UserId: manager?.id || null,
+    };
+
+    const [zone, wasCreated] = await Zone.findOrCreate({
+      where: { name: zoneSeed.name },
+      defaults: payload,
+    });
+
+    if (wasCreated) {
+      created += 1;
+    } else if (manager && zone.UserId !== manager.id) {
+      await zone.update({ UserId: manager.id });
+      updated += 1;
+    }
+  }
+
   const existing = await Zone.count();
-  console.log(`✓ Zones seedées : ${created} créées, ${existing} existantes au total`);
+  console.log(`✓ Zones seedées : ${created} créées, ${updated} rattachées, ${existing} existantes au total`);
 }
 
 async function seedCategories() {
@@ -236,6 +262,59 @@ async function seedProducts() {
   console.log(`✓ Produits seedés : ${created} créés, ${existing} existants au total`);
 }
 
+async function seedProductEntryMovements() {
+  const products = await Product.findAll({
+    include: [
+      { model: Zone },
+      { model: User, as: 'manager' },
+    ],
+    order: [["id", "ASC"]],
+  });
+  const fallbackUser = await User.findOne({
+    where: { role: 'admin', status: 'approved' },
+    order: [["id", "ASC"]],
+  }) || await User.findOne({ order: [["id", "ASC"]] });
+
+  if (!fallbackUser) {
+    console.log("⚠️ Entrées seed ignorées : aucun utilisateur disponible");
+    return;
+  }
+
+  let created = 0;
+
+  for (const product of products) {
+    const movementUser = product.manager || fallbackUser;
+    const quantity = parseInt(product.quantity) || 0;
+
+    const [, wasCreated] = await Movement.findOrCreate({
+      where: {
+        productId: product.id,
+        type: "Entrée",
+        reason: "Création du produit",
+      },
+      defaults: {
+        productId: product.id,
+        productName: product.name,
+        sourceZoneId: null,
+        sourceZoneName: null,
+        destinationZoneId: product.Zone?.id || null,
+        destinationZoneName: product.Zone?.name || null,
+        userId: movementUser.id,
+        userName: movementUser.username || "Système",
+        quantityBefore: 0,
+        quantityAfter: quantity,
+        quantityMoved: quantity,
+        reason: "Création du produit",
+        notes: "Entrée générée automatiquement depuis les produits existants",
+      },
+    });
+
+    if (wasCreated) created += 1;
+  }
+
+  console.log(`✓ Entrées produits seedées : ${created} créées`);
+}
+
 async function seedMovements() {
   const existing = await Movement.count();
   if (existing > 0) {
@@ -283,7 +362,8 @@ async function initializeDatabase() {
   await seedZones();      // 3. Ensuite les zones
   await seedCategories(); // 4. Ensuite les catégories
   await seedProducts();   // 5. Ensuite les produits (dépend des users, zones et catégories)
-  await seedMovements();  // 6. Enfin les mouvements
+  await seedProductEntryMovements(); // 6. Créer les entrées pour les produits existants/seedés
+  await seedMovements();  // 7. Enfin les mouvements additionnels
 
   console.log("🎉 Base de données initialisée avec succès !");
 }

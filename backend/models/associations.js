@@ -19,6 +19,9 @@ Product.belongsTo(Category, { foreignKey: 'CategoryId' });
 User.hasMany(Product, { foreignKey: 'UserId', as: 'products' });
 Product.belongsTo(User, { foreignKey: 'UserId', as: 'manager' });
 
+User.hasMany(Zone, { foreignKey: 'UserId', as: 'zones' });
+Zone.belongsTo(User, { foreignKey: 'UserId', as: 'manager' });
+
 // Associations des mouvements
 Movement.belongsTo(Product, { foreignKey: 'productId', as: 'product' });
 Movement.belongsTo(Zone, { foreignKey: 'sourceZoneId', as: 'sourceZone' });

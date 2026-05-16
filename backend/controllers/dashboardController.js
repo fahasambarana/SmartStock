@@ -53,16 +53,85 @@ const getMovementScope = (user) => (
   getRole(user) === 'manager' ? { userId: user.id } : {}
 );
 
+const getManagerZoneIds = async (user) => {
+  if (getRole(user) !== 'manager') return null;
+
+  const [ownedZones, productZones] = await Promise.all([
+    Zone.findAll({
+      where: { UserId: user.id },
+      attributes: ['id'],
+      raw: true,
+    }),
+    Product.findAll({
+      where: {
+        UserId: user.id,
+        ZoneId: { [Sequelize.Op.ne]: null },
+      },
+      attributes: ['ZoneId'],
+      raw: true,
+    }),
+  ]);
+
+  return [
+    ...new Set([
+      ...ownedZones.map((zone) => zone.id),
+      ...productZones.map((product) => product.ZoneId).filter(Boolean),
+    ]),
+  ];
+};
+
+const getScopedZones = async (user) => {
+  const zoneIds = await getManagerZoneIds(user);
+  if (zoneIds === null) return Zone.findAll({ order: [['createdAt', 'DESC']] });
+  if (zoneIds.length === 0) return [];
+
+  return Zone.findAll({
+    where: { id: { [Sequelize.Op.in]: zoneIds } },
+    order: [['createdAt', 'DESC']],
+  });
+};
+
+const getZoneProductSummary = async (zone, user) => {
+  const productWhere = {
+    ZoneId: zone.id,
+    ...getProductScope(user),
+  };
+
+  const [productCount, totalQuantity, products] = await Promise.all([
+    Product.count({ where: productWhere }),
+    Product.sum('quantity', { where: productWhere }),
+    Product.findAll({
+      where: productWhere,
+      attributes: ['quantity', 'volume_unitaire'],
+      raw: true,
+    }),
+  ]);
+  const unit = zone.unite_capacite || 'Unités';
+  const capacityUsed = products.reduce((sum, product) => {
+    const quantity = Number(product.quantity) || 0;
+    if (unit === 'Volume') {
+      return sum + quantity * (Number(product.volume_unitaire) || 0);
+    }
+    return sum + quantity;
+  }, 0);
+
+  return {
+    productCount,
+    totalQuantity: Number(totalQuantity) || 0,
+    capacityUsed,
+  };
+};
+
 const buildDashboard = async (user) => {
   const productScope = getProductScope(user);
   const movementScope = getMovementScope(user);
+  const isManager = getRole(user) === 'manager';
 
   const [kpis, movementChart, zoneChart, recentAlerts] = await Promise.all([
       safeDashboardSection('kpis', DEFAULT_KPIS, async () => {
         const [
           scopedProducts,
           allProducts,
-          totalZones,
           totalMovements,
           totalManagers,
           totalCategories,
@@ -72,7 +141,6 @@ const buildDashboard = async (user) => {
         ] = await Promise.all([
           safeDashboardValue('produits manager', 0, () => Product.count({ where: productScope })),
           safeDashboardValue('produits total', 0, () => Product.count()),
-          safeDashboardValue('zones total', 0, () => Zone.count()),
           safeDashboardValue('mouvements total', 0, () => Movement.count({ where: movementScope })),
           safeDashboardValue('managers total', 0, () => User.count({ where: { role: { [Sequelize.Op.in]: ['manager', 'Manager'] } } })),
           safeDashboardValue('categories total', 0, () => Category.count()),
@@ -85,14 +153,18 @@ const buildDashboard = async (user) => {
           safeDashboardValue('stock faible total', 0, () => Product.count({
             where: { quantity: { [Sequelize.Op.lte]: 10 } }
           })),
-          safeDashboardValue('zones occupation', [], () => Zone.findAll())
+          safeDashboardValue('zones occupation', [], () => getScopedZones(user))
         ]);
 
-        const isManager = getRole(user) === 'manager';
-        const totalProducts = isManager && scopedProducts > 0 ? scopedProducts : allProducts;
-        const lowStock = isManager && scopedProducts > 0 ? scopedLowStock : allLowStock;
+        const totalProducts = isManager ? scopedProducts : allProducts;
+        const lowStock = isManager ? scopedLowStock : allLowStock;
+        const totalZones = zones.length;
+        const zoneUsages = await Promise.all(zones.map((zone) => getZoneProductSummary(zone, user)));
         let totalPercent = 0;
-        zones.forEach(z => { if (z.capacite_max > 0) totalPercent += (z.capacite_actuelle / z.capacite_max) * 100; });
+        zones.forEach((zone, index) => {
+          const max = Number(zone.capacite_max) || 0;
+          if (max > 0) totalPercent += (zoneUsages[index].capacityUsed / max) * 100;
+        });
         const avgOcc = zones.length > 0 ? totalPercent / zones.length : 0;
         return {
           totalProducts,
@@ -138,22 +210,27 @@ const buildDashboard = async (user) => {
       }),
 
       safeDashboardSection('zones', DEFAULT_ZONE_CHART, async () => {
-        const zones = await Zone.findAll();
-        const details = zones.map((zone) => {
+        const zones = await getScopedZones(user);
+        const details = await Promise.all(zones.map(async (zone) => {
           const max = Number(zone.capacite_max) || 0;
-          const current = Number(zone.capacite_actuelle) || 0;
+          const productSummary = await getZoneProductSummary(zone, user);
+          const current = productSummary.capacityUsed;
           const occupation = max > 0 ? Math.round((current / max) * 100) : 0;
 
           return {
             id: zone.id,
             name: zone.name,
             type: zone.type || 'Standard',
+            location: zone.location || 'Non renseigné',
             current,
             max,
             unit: zone.unite_capacite || 'Unités',
-            occupation
+            occupation,
+            productCount: productSummary.productCount,
+            totalQuantity: productSummary.totalQuantity,
+            managerId: zone.UserId || null,
           };
-        });
+        }));
 
         return {
           labels: details.map(z => z.name),

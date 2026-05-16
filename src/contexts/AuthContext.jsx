@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState } from 'react';
 
 const AuthContext = createContext();
 
@@ -14,20 +14,31 @@ export const AuthProvider = ({ children }) => {
     return !!(token && role);
   });
   const [user, setUser] = useState(() => {
+    const storedUser = localStorage.getItem('user');
     const role = localStorage.getItem('role');
+    if (storedUser) {
+      try {
+        return JSON.parse(storedUser);
+      } catch {
+        localStorage.removeItem('user');
+      }
+    }
     return role ? { role } : null;
   });
 
-  const login = (token, role = 'Employee') => {
+  const login = (token, role = 'Employee', userData = null) => {
+    const sessionUser = userData || { role };
     localStorage.setItem('token', token);
     localStorage.setItem('role', role);
+    localStorage.setItem('user', JSON.stringify(sessionUser));
     setIsAuthenticated(true);
-    setUser({ role });
+    setUser(sessionUser);
   };
 
   const logout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('role');
+    localStorage.removeItem('user');
     setIsAuthenticated(false);
     setUser(null);
   };

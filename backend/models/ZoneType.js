@@ -22,7 +22,7 @@ const ZoneType = sequelize.define('ZoneType', {
     defaultValue: 0,
   },
   unite_capacite: {
-    type: DataTypes.ENUM('Volume', 'Unités', 'Poids', 'Surface'),
+    type: DataTypes.ENUM('Volume', 'Unités', 'Pièces', 'Kg', 'Poids', 'Surface'),
     allowNull: false,
     defaultValue: 'Unités',
   },

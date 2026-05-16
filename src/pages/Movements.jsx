@@ -160,7 +160,7 @@ const Movements = () => {
                 </div>
                 <div className="text-right">
                   <span className="text-3xl font-black text-gray-800 dark:text-gray-100">
-                    {m.quantity}
+                    {m.quantityMoved ?? m.quantity}
                   </span>
                   <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Unités</p>
                 </div>

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FiPlus, FiTrash2, FiEdit2, FiBox, FiFilter, FiUser, FiSearch, FiAlertCircle } from 'react-icons/fi';
+import { FiPlus, FiTrash2, FiEdit2, FiBox, FiFilter, FiUser, FiSearch, FiAlertCircle, FiMapPin } from 'react-icons/fi';
 import api from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -8,6 +8,7 @@ const Products = () => {
   const { user } = useAuth();
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
+  const [zones, setZones] = useState([]);
   const [managers, setManagers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -40,14 +41,16 @@ const Products = () => {
       if (filters.categoryId) params.append('CategoryId', filters.categoryId);
       if (filters.managerId) params.append('UserId', filters.managerId);
       
-      const [prodRes, catRes, userRes] = await Promise.all([
+      const [prodRes, catRes, zoneRes, userRes] = await Promise.all([
         api.get(`/products?${params.toString()}`),
         api.get('/categories'),
+        api.get('/zones'),
         user.role === 'admin' ? api.get('/users') : Promise.resolve({ data: { data: [] } })
       ]);
 
       setProducts(prodRes.data);
       setCategories(catRes.data);
+      setZones(zoneRes.data || []);
       if (user.role === 'admin') {
         setManagers(userRes.data.data.filter(u => u.role === 'manager'));
       }
@@ -293,6 +296,28 @@ const Products = () => {
                     onChange={(e) => setFormData({...formData, price: e.target.value})}
                     className={`${nmInset} w-full px-6 py-4 rounded-2xl outline-none bg-transparent dark:text-white`}
                   />
+                </div>
+
+                <div className="md:col-span-2">
+                  <label className="block text-[10px] font-black text-gray-400 uppercase mb-2 ml-2 tracking-widest">
+                    Zone de stockage
+                  </label>
+                  <div className={`${nmInset} flex items-center px-5 rounded-2xl`}>
+                    <FiMapPin className="text-gray-400 mr-3" />
+                    <select
+                      value={formData.ZoneId || ''}
+                      onChange={(e) => setFormData({...formData, ZoneId: e.target.value})}
+                      className="w-full py-4 outline-none bg-transparent dark:text-white"
+                      required
+                    >
+                      <option value="">Sélectionner une zone</option>
+                      {zones.map(zone => (
+                        <option key={zone.id} value={zone.id}>
+                          {zone.name} - max {zone.capacite_max} {zone.unite_capacite}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
 
                 <div className="md:col-span-2 flex gap-4 mt-8">

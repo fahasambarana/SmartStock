@@ -269,7 +269,11 @@ const Zones = () => {
                 className={`${nmInset} w-full p-3 rounded-xl outline-none bg-transparent`}
               >
                 <option value="Unités">Unités</option>
+                <option value="Pièces">Pièces</option>
+                <option value="Kg">Kg</option>
                 <option value="Volume">Volume (m³)</option>
+                <option value="Poids">Poids</option>
+                <option value="Surface">Surface (m²)</option>
               </select>
             </div>
             <div>

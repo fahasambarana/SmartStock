@@ -37,7 +37,7 @@ const Login = () => {
     setIsLoading(true);
     try {
       const response = await apiLogin({ email, password });
-      login(response.data.token, response.data.role);
+      login(response.data.token, response.data.role, response.data.user);
       navigate('/dashboard');
     } catch (error) {
       console.error('Login failed:', error);
